@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GEOFINDERS - Real World Battle Royale</title>
-
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-
+    
     <!-- Leaflet CSS & JS (Mapas) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -17,42 +16,35 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@400;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Rajdhani', sans-serif;
             background-color: #0f172a;
             color: #e2e8f0;
-            overflow: hidden;
-            /* Prevent pull-to-refresh on mobile */
+            overflow: hidden; /* Prevent pull-to-refresh on mobile */
             touch-action: none;
         }
-
         .font-military {
             font-family: 'Black Ops One', cursive;
         }
-
         #map {
             height: 100vh;
             width: 100vw;
             z-index: 0;
             background: #1a1a1a;
         }
-
         /* Custom UI Layers */
         .ui-layer {
             position: absolute;
             z-index: 1000;
-            pointer-events: none;
-            /* Let clicks pass through to map where needed */
+            pointer-events: none; /* Let clicks pass through to map where needed */
         }
-
         .interactive {
             pointer-events: auto;
         }
-
+        
         /* Scope Overlay */
         .scope-overlay {
             position: absolute;
@@ -65,10 +57,8 @@
             border-radius: 50%;
             pointer-events: none;
             z-index: 900;
-            display: none;
-            /* Hidden by default */
+            display: none; /* Hidden by default */
         }
-
         .scope-crosshair {
             position: absolute;
             top: 50%;
@@ -85,23 +75,23 @@
             left: 0;
             width: 100%;
             height: 40px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0,0,0,0.8);
             overflow: hidden;
             z-index: 1001;
             display: none;
         }
-
         .compass-strip {
             width: 200%;
             height: 100%;
-            background: repeating-linear-gradient(90deg,
-                    transparent 0px,
-                    transparent 19px,
-                    #00ff00 20px);
+            background: repeating-linear-gradient(
+                90deg,
+                transparent 0px,
+                transparent 19px,
+                #00ff00 20px
+            );
             position: absolute;
             transition: transform 0.1s linear;
         }
-
         .compass-marker {
             position: absolute;
             left: 50%;
@@ -114,23 +104,14 @@
 
         /* Animations */
         @keyframes pulse-red {
-            0% {
-                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7);
-            }
-
-            70% {
-                box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
-            }
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
         }
-
         .damage-effect {
             animation: pulse-red 1s infinite;
         }
-
+        
         /* Modal Backdrop */
         .modal-backdrop {
             background-color: rgba(0, 0, 0, 0.9);
@@ -147,7 +128,6 @@
         }
     </style>
 </head>
-
 <body>
 
     <!-- --- APP CONTAINER --- -->
@@ -156,53 +136,40 @@
         <!-- SCREEN: LOGIN / LOBBY -->
         <div id="lobby-screen" class="modal-backdrop z-50 flex flex-col gap-4">
             <h1 class="text-4xl text-green-500 font-military tracking-widest text-center mb-4">GEOFINDERS</h1>
-
+            
             <div class="w-full max-w-sm bg-slate-800 p-6 rounded-lg border border-slate-600 shadow-xl">
                 <!-- Step 1: User Info -->
                 <div id="step-auth" class="flex flex-col gap-3">
                     <label class="text-sm text-gray-400">Nombre de Agente</label>
-                    <input type="text" id="username-input"
-                        class="bg-slate-900 border border-slate-700 p-3 rounded text-white focus:outline-none focus:border-green-500"
-                        placeholder="Ej: Snake">
-                    <button id="btn-auth"
-                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded transition uppercase tracking-wider">
+                    <input type="text" id="username-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white focus:outline-none focus:border-green-500" placeholder="Ej: Snake">
+                    <button id="btn-auth" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded transition uppercase tracking-wider">
                         Conectar Satélite
                     </button>
                 </div>
 
                 <!-- Step 2: Game Setup -->
                 <div id="step-game" class="hidden flex flex-col gap-3">
-                    <p class="text-green-400 text-sm mb-2">Conectado como: <span id="display-username"
-                            class="font-bold text-white"></span></p>
-
+                    <p class="text-green-400 text-sm mb-2">Conectado como: <span id="display-username" class="font-bold text-white"></span></p>
+                    
                     <div class="flex gap-2 mb-2">
-                        <button
-                            class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500"
-                            onclick="setMode('SOLO')">SOLO</button>
-                        <button
-                            class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500"
-                            onclick="setMode('DUO')">DUO</button>
+                        <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500" onclick="setMode('SOLO')">SOLO</button>
+                        <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500" onclick="setMode('DUO')">DUO</button>
                     </div>
 
                     <label class="text-sm text-gray-400">ID de Operación (Partida)</label>
-                    <input type="text" id="game-id-input"
-                        class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase"
-                        placeholder="Ej: ALPHA1">
-
+                    <input type="text" id="game-id-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase" placeholder="Ej: ALPHA1">
+                    
                     <div id="duo-input-container" class="hidden flex flex-col gap-2">
-                        <label class="text-sm text-gray-400">ID de Equipo (Solo para DUO)</label>
-                        <input type="text" id="team-id-input"
-                            class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase"
-                            placeholder="Ej: TEAM_A">
+                         <label class="text-sm text-gray-400">ID de Equipo (Solo para DUO)</label>
+                         <input type="text" id="team-id-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase" placeholder="Ej: TEAM_A">
                     </div>
 
-                    <button id="btn-join"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded mt-2 uppercase">
+                    <button id="btn-join" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded mt-2 uppercase">
                         Desplegar en Zona
                     </button>
                 </div>
             </div>
-
+            
             <div class="text-xs text-gray-500 text-center max-w-xs">
                 ⚠️ Requiere GPS y permisos de sensores. Juega en exteriores para mejor precisión.
             </div>
@@ -210,13 +177,12 @@
 
         <!-- SCREEN: HUD (Heads Up Display) -->
         <div id="hud-layer" class="ui-layer w-full h-full hidden">
-
+            
             <!-- Compass Top Bar -->
             <div class="compass-container flex" id="compass-ui">
                 <div class="compass-marker"></div>
                 <div class="compass-strip" id="compass-strip"></div>
-                <div class="absolute top-8 left-1/2 transform -translate-x-1/2 text-xs font-mono text-green-500"
-                    id="heading-display">0° N</div>
+                <div class="absolute top-8 left-1/2 transform -translate-x-1/2 text-xs font-mono text-green-500" id="heading-display">0° N</div>
             </div>
 
             <!-- Top Info: Timer & Players -->
@@ -225,7 +191,7 @@
                     <div class="text-xs text-gray-300">ESTADO</div>
                     <div class="font-bold text-green-400" id="game-phase">EN ESPERA</div>
                 </div>
-
+                
                 <div class="bg-black/60 backdrop-blur p-2 rounded flex flex-col items-end">
                     <div class="text-2xl font-military text-white" id="alive-count">--</div>
                     <div class="text-[10px] text-gray-400">VIVOS</div>
@@ -233,8 +199,7 @@
             </div>
 
             <!-- Radar / Storm Alert -->
-            <div id="alert-box"
-                class="absolute top-24 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-4 py-2 rounded font-bold text-center hidden shadow-lg animate-pulse">
+            <div id="alert-box" class="absolute top-24 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-4 py-2 rounded font-bold text-center hidden shadow-lg animate-pulse">
                 ⚠️ ZONA SEGURA REDUCIÉNDOSE
             </div>
 
@@ -245,7 +210,7 @@
 
             <!-- Bottom Controls -->
             <div class="absolute bottom-0 left-0 w-full p-4 flex flex-col gap-2 pointer-events-none">
-
+                
                 <!-- Health & Status -->
                 <div class="flex items-end gap-2 mb-2">
                     <div class="bg-black/70 p-3 rounded-lg flex-1 border border-gray-700">
@@ -264,24 +229,21 @@
 
                 <!-- Action Buttons -->
                 <div class="flex justify-between items-center pointer-events-auto">
-                    <button id="btn-sos"
-                        class="bg-red-800 hover:bg-red-900 text-white p-4 rounded-full shadow-lg border-2 border-red-500 font-bold text-xs w-16 h-16 flex items-center justify-center">
+                    <button id="btn-sos" class="bg-red-800 hover:bg-red-900 text-white p-4 rounded-full shadow-lg border-2 border-red-500 font-bold text-xs w-16 h-16 flex items-center justify-center">
                         SOS
                     </button>
 
-                    <button id="btn-shoot"
-                        class="bg-yellow-600 hover:bg-yellow-500 active:scale-95 transition text-black p-4 rounded-full shadow-lg border-2 border-yellow-300 w-20 h-20 flex items-center justify-center">
+                    <button id="btn-shoot" class="bg-yellow-600 hover:bg-yellow-500 active:scale-95 transition text-black p-4 rounded-full shadow-lg border-2 border-yellow-300 w-20 h-20 flex items-center justify-center">
                         <i class="fa-solid fa-crosshairs text-3xl"></i>
                     </button>
-
-                    <button id="btn-center"
-                        class="bg-slate-700 text-white p-3 rounded-full shadow-lg w-12 h-12 flex items-center justify-center">
+                    
+                    <button id="btn-center" class="bg-slate-700 text-white p-3 rounded-full shadow-lg w-12 h-12 flex items-center justify-center">
                         <i class="fa-solid fa-location-arrow"></i>
                     </button>
                 </div>
             </div>
         </div>
-
+        
         <!-- The Map -->
         <div id="map"></div>
 
@@ -289,8 +251,7 @@
         <div id="dead-screen" class="modal-backdrop hidden flex-col text-center">
             <h2 class="text-5xl text-red-600 font-military mb-4">ELIMINADO</h2>
             <p class="text-gray-300 mb-6">Tu señal se ha perdido.</p>
-            <button onclick="location.reload()" class="bg-slate-600 px-6 py-2 rounded text-white">Volver al
-                Lobby</button>
+            <button onclick="location.reload()" class="bg-slate-600 px-6 py-2 rounded text-white">Volver al Lobby</button>
         </div>
 
     </div>
@@ -298,7 +259,8 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        // REMOVED signInAnonymously from imports
+        import { getAuth, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // --- 1. CONFIGURATION & STATE ---
@@ -345,16 +307,17 @@
         const usernameInput = document.getElementById('username-input');
 
         btnAuth.addEventListener('click', async () => {
-            if (!usernameInput.value) return alert("Introduce un nombre");
+            if(!usernameInput.value) return alert("Introduce un nombre");
             state.username = usernameInput.value;
             btnAuth.innerText = "Conectando...";
-
+            
             try {
-                // Priority: Custom Token (if injected) -> Anonymous
+                // Priority: Custom Token Only (Anonymous Removed)
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth);
+                    alert("Error: No se encontró token de autenticación y el modo anónimo está desactivado.");
+                    btnAuth.innerText = "Conectar Satélite";
                 }
             } catch (e) {
                 console.error("Auth error", e);
@@ -379,8 +342,8 @@
             state.mode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('bg-green-900', 'border-green-500'));
             event.target.classList.add('bg-green-900', 'border-green-500');
-
-            if (mode === 'DUO') {
+            
+            if(mode === 'DUO') {
                 document.getElementById('duo-input-container').classList.remove('hidden');
                 document.getElementById('duo-status').classList.remove('hidden');
             } else {
@@ -391,12 +354,12 @@
 
         document.getElementById('btn-join').addEventListener('click', async () => {
             const gameId = document.getElementById('game-id-input').value.toUpperCase();
-            if (!gameId) return alert("Falta ID de Partida");
+            if(!gameId) return alert("Falta ID de Partida");
             state.gameId = gameId;
 
-            if (state.mode === 'DUO') {
+            if(state.mode === 'DUO') {
                 state.teamId = document.getElementById('team-id-input').value.toUpperCase();
-                if (!state.teamId) return alert("Falta ID de Equipo para modo Duo");
+                if(!state.teamId) return alert("Falta ID de Equipo para modo Duo");
             } else {
                 state.teamId = state.userId; // In solo, teamId is own ID
             }
@@ -430,7 +393,7 @@
             initMap();
             initSensors();
             initFirestoreListeners();
-
+            
             // Start Game Loop
             setInterval(gameLoop, 1000);
         }
@@ -468,17 +431,17 @@
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition((position) => {
                     const { latitude, longitude, accuracy } = position.coords;
-
+                    
                     state.lat = latitude;
                     state.lng = longitude;
 
                     // Update UI Map Center if strictly following or first load
                     if (!state.userMarker) {
-                        state.map.setView([latitude, longitude], 18);
-                        state.userMarker = L.marker([latitude, longitude], { icon: state.icons.me }).addTo(state.map);
-
-                        // Create initial player doc
-                        createPlayerDoc();
+                         state.map.setView([latitude, longitude], 18);
+                         state.userMarker = L.marker([latitude, longitude], {icon: state.icons.me}).addTo(state.map);
+                         
+                         // Create initial player doc
+                         createPlayerDoc();
                     } else {
                         state.userMarker.setLatLng([latitude, longitude]);
                         updatePlayerDoc();
@@ -496,7 +459,7 @@
             // 2. Compass (DeviceOrientation)
             window.addEventListener('deviceorientationabsolute', handleOrientation, true);
             window.addEventListener('deviceorientation', (e) => {
-                if (!e.absolute && e.webkitCompassHeading) {
+                if(!e.absolute && e.webkitCompassHeading) {
                     // iOS specific
                     handleOrientation({ alpha: e.webkitCompassHeading });
                 } else if (!e.absolute) {
@@ -507,28 +470,28 @@
 
         function handleOrientation(event) {
             let heading = event.alpha; // Z-axis rotation
-
+            
             // iOS gives webkitCompassHeading directly
-            if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
-
+            if(event.webkitCompassHeading) heading = event.webkitCompassHeading;
+            
             // Android absolute requires math usually, but alpha is a decent approx for games if absolute not avail
             // In a real prod app, we'd use complex sensor fusion. For this game prototype:
-            if (heading) {
+            if(heading) {
                 state.heading = 360 - heading; // Invert for CSS rotation logic usually, or keep as compass deg
                 // Actually for compass strip:
                 // If heading is 0 (North), strip center.
                 // 90 (East).
-
+                
                 // Update Compass UI
                 // Standard Compass: 0=N, 90=E, 180=S, 270=W
                 // Strip UI logic: Translate X based on degrees
                 const strip = document.getElementById('compass-strip');
-                const deg = heading;
+                const deg = heading; 
                 state.heading = deg; // Store true heading 0-360
 
                 // Visual update (simplified for performance)
                 document.getElementById('heading-display').innerText = Math.round(deg) + "°";
-
+                
                 // Move strip. 
                 // Imagine strip is 0.....360.....0
                 // We shift background position or transform
@@ -537,11 +500,11 @@
         }
 
         // --- 5. FIRESTORE LOGIC ---
-
+        
         async function createPlayerDoc() {
-            if (!state.userId || !state.gameId) return;
+            if(!state.userId || !state.gameId) return;
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
-
+            
             await setDoc(playerRef, {
                 username: state.username,
                 teamId: state.teamId,
@@ -554,9 +517,9 @@
         }
 
         async function updatePlayerDoc() {
-            if (!state.userId || !state.gameId || state.isDead) return;
+            if(!state.userId || !state.gameId || state.isDead) return;
             const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
-
+            
             await updateDoc(playerRef, {
                 lat: state.lat,
                 lng: state.lng,
@@ -566,10 +529,10 @@
         }
 
         async function takeDamage(amount, source) {
-            if (state.isDead) return;
-
+            if(state.isDead) return;
+            
             state.hp = Math.max(0, state.hp - amount);
-
+            
             // Visual Effect
             document.body.classList.add('damage-effect');
             setTimeout(() => document.body.classList.remove('damage-effect'), 500);
@@ -587,8 +550,8 @@
             // Simplified Duo: We just use individual HP but if one dies, game over logic handles it.
             // OR: Update all teammates HP (requires multiple writes, risky without transactions).
             // Let's stick to: Individual HP tracking, but HUD shows aggregate or lowest.
-
-            if (state.hp <= 0) {
+            
+            if(state.hp <= 0) {
                 die();
             }
         }
@@ -603,7 +566,7 @@
         function initFirestoreListeners() {
             // Listen to Players
             const playersRef = collection(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players`);
-
+            
             onSnapshot(playersRef, (snapshot) => {
                 const aliveCount = snapshot.docs.filter(d => !d.data().isDead).length;
                 document.getElementById('alive-count').innerText = aliveCount;
@@ -628,7 +591,7 @@
                     // Handle other players
                     if (change.type === "added" || change.type === "modified") {
                         const isTeammate = (state.mode === 'DUO' && data.teamId === state.teamId);
-
+                        
                         // Store in local cache
                         if (isTeammate) {
                             state.teammates[pid] = { ...data, id: pid };
@@ -646,7 +609,7 @@
                             alert("¡TU PAREJA HA CAÍDO! (Simulación: En juego real, revivir)");
                         }
                     }
-
+                    
                     if (change.type === "removed") {
                         if (state.enemies[pid] && state.enemies[pid].marker) state.enemies[pid].marker.remove();
                         delete state.enemies[pid];
@@ -699,7 +662,7 @@
         // --- 6. GAME LOOP & LOGIC ---
 
         function gameLoop() {
-            if (!state.user || state.isDead) return;
+            if(!state.user || state.isDead) return;
 
             // 1. Duo Distance Check
             if (state.mode === 'DUO') {
@@ -750,8 +713,8 @@
                     document.getElementById('alert-box').classList.remove('hidden');
                     document.getElementById('alert-box').innerText = "⚠️ FUERA DE ZONA - RECIBIENDO DAÑO";
                     // Take damage every tick? No, every few seconds.
-                    if (Date.now() % 5000 < 1000) { // roughly every 5s
-                        takeDamage(5, "STORM");
+                    if(Date.now() % 5000 < 1000) { // roughly every 5s
+                         takeDamage(5, "STORM");
                     }
                 } else {
                     document.getElementById('alert-box').classList.add('hidden');
@@ -775,7 +738,7 @@
             scope.style.display = 'none';
             fireWeapon();
         });
-
+        
         // Mouse support for desktop testing
         btnShoot.addEventListener('mousedown', () => scope.style.display = 'block');
         btnShoot.addEventListener('mouseup', () => {
@@ -792,9 +755,9 @@
             // Logic: iterate enemies. Check bearing + distance.
             // Weapon Range: 40 meters
             // Weapon Spread: 10 degrees (5 deg left/right)
-
-            const range = 50;
-            const spread = 10;
+            
+            const range = 50; 
+            const spread = 10; 
             const myLat = state.lat;
             const myLng = state.lng;
             const myHeading = state.heading; // 0-360
@@ -802,14 +765,14 @@
             let hit = false;
 
             Object.values(state.enemies).forEach(enemy => {
-                if (enemy.isDead) return;
+                if(enemy.isDead) return;
 
                 const dist = getDistanceFromLatLonInMeters(myLat, myLng, enemy.lat, enemy.lng);
                 if (dist > range) return;
 
                 // Calculate bearing to enemy
                 const bearing = getBearing(myLat, myLng, enemy.lat, enemy.lng);
-
+                
                 // Compare with my heading
                 // Need to handle the 359 -> 1 degree wraparound
                 let diff = Math.abs(bearing - myHeading);
@@ -825,8 +788,8 @@
             // Feedback
             btnShoot.style.backgroundColor = hit ? 'red' : 'gray';
             setTimeout(() => btnShoot.style.backgroundColor = '', 200);
-
-            if (hit) alert("¡IMPACTO CONFIRMADO!");
+            
+            if(hit) alert("¡IMPACTO CONFIRMADO!");
         }
 
         async function registerHit(targetId) {
@@ -837,34 +800,34 @@
             // we will simulate by updating the target doc directly assuming the rules allow it.
             // NOTE: Firestore rules usually block updating others. 
             // If this fails, the mechanic requires a Cloud Function or an "Events" collection the victim listens to.
-
+            
             // Hack for prototype: Update enemy doc hp directly.
             const enemyRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${targetId}`);
             try {
                 const snap = await getDoc(enemyRef);
-                if (snap.exists()) {
+                if(snap.exists()) {
                     let newHp = snap.data().hp - 20; // 20 damage
                     await updateDoc(enemyRef, { hp: newHp });
                 }
-            } catch (e) {
+            } catch(e) {
                 console.error("Hit registration failed. Permissions?", e);
             }
         }
 
         // --- 8. UTILITIES (Math) ---
-
+        
         function updateHUD() {
             document.getElementById('hp-bar').style.width = state.hp + '%';
             document.getElementById('hp-text').innerText = Math.round(state.hp) + '%';
-            if (state.hp < 30) document.getElementById('hp-bar').classList.replace('bg-green-500', 'bg-red-600');
+            if(state.hp < 30) document.getElementById('hp-bar').classList.replace('bg-green-500', 'bg-red-600');
         }
 
         document.getElementById('btn-center').addEventListener('click', () => {
-            if (state.map && state.lat) state.map.setView([state.lat, state.lng], 18);
+             if(state.map && state.lat) state.map.setView([state.lat, state.lng], 18);
         });
 
         document.getElementById('btn-sos').addEventListener('click', () => {
-            if (confirm("¿ACTIVAR SOS? Esto terminará tu partida.")) {
+            if(confirm("¿ACTIVAR SOS? Esto terminará tu partida.")) {
                 die();
                 // Logic to notify organizer would go here
                 alert("SEÑAL SOS ENVIADA. QUÉDATE DONDE ESTÁS.");
@@ -874,22 +837,22 @@
         // Haversine Formula (Distance in Meters)
         function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
             var R = 6371; // Radius of the earth in km
-            var dLat = deg2rad(lat2 - lat1);
-            var dLon = deg2rad(lon2 - lon1);
-            var a =
-                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            var dLat = deg2rad(lat2-lat1);  
+            var dLon = deg2rad(lon2-lon1); 
+            var a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
             var d = R * c; // Distance in km
             return d * 1000; // Meters
         }
 
         function deg2rad(deg) {
-            return deg * (Math.PI / 180);
+            return deg * (Math.PI/180);
         }
 
         function rad2deg(rad) {
-            return rad * (180 / Math.PI);
+            return rad * (180/Math.PI);
         }
 
         // Bearing calculation (0-360 degrees)
@@ -901,7 +864,7 @@
 
             let y = Math.sin(destLng - startLng) * Math.cos(destLat);
             let x = Math.cos(startLat) * Math.sin(destLat) -
-                Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+                    Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
             let brng = Math.atan2(y, x);
             brng = rad2deg(brng);
             return (brng + 360) % 360;
@@ -909,5 +872,4 @@
 
     </script>
 </body>
-
 </html>
