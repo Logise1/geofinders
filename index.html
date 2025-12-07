@@ -150,6 +150,7 @@
                 <!-- Step 2: Game Setup -->
                 <div id="step-game" class="hidden flex flex-col gap-3">
                     <p class="text-green-400 text-sm mb-2">Conectado como: <span id="display-username" class="font-bold text-white"></span></p>
+                    <p class="text-gray-500 text-xs mb-2">ID: <span id="display-userid" class="font-mono text-gray-400"></span></p>
                     
                     <div class="flex gap-2 mb-2">
                         <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500" onclick="setMode('SOLO')">SOLO</button>
@@ -259,12 +260,10 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        // REMOVED signInAnonymously from imports
-        import { getAuth, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        // NOTA: Eliminamos firebase-auth porque el usuario solicitó identificación SIN Auth.
         import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // --- 1. CONFIGURATION & STATE ---
-        // Firebase Configuration (User Provided)
         const firebaseConfig = {
             apiKey: "AIzaSyBMYTnk-CljdWENtDQqqKUBmQzBQuoxYPo",
             authDomain: "hello-74404.firebaseapp.com",
@@ -276,65 +275,66 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = "geofinders-v1"; // Specific app namespace
+        const appId = "geofinders-v1";
 
         // Global State
         const state = {
-            user: null,
-            userId: null,
+            userId: null,   // Generated locally without Auth
             username: "Soldado",
             gameId: null,
-            teamId: null, // For Duo
-            mode: 'SOLO', // SOLO or DUO
+            teamId: null,
+            mode: 'SOLO',
             lat: 0,
             lng: 0,
-            heading: 0, // Compass heading 0-360
+            heading: 0,
             hp: 100,
             isDead: false,
             lastShot: 0,
-            enemies: {}, // Local cache of enemy positions
+            enemies: {},
             teammates: {},
             map: null,
             userMarker: null,
             stormCircle: null,
-            gameData: null // Stores storm center, radius, etc.
+            gameData: null
         };
 
-        // --- 2. AUTHENTICATION ---
+        // --- 2. IDENTITY (No Auth Logic) ---
+        
+        // Helper to get or create a persistent random ID
+        function getOrGenerateUserId() {
+            let id = localStorage.getItem('geofinders_uid');
+            if (!id) {
+                // Generate a random string ID
+                id = 'player_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+                localStorage.setItem('geofinders_uid', id);
+            }
+            return id;
+        }
+
         const btnAuth = document.getElementById('btn-auth');
         const usernameInput = document.getElementById('username-input');
 
-        btnAuth.addEventListener('click', async () => {
-            if(!usernameInput.value) return alert("Introduce un nombre");
-            state.username = usernameInput.value;
-            btnAuth.innerText = "Conectando...";
-            
-            try {
-                // Priority: Custom Token Only (Anonymous Removed)
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    alert("Error: No se encontró token de autenticación y el modo anónimo está desactivado.");
-                    btnAuth.innerText = "Conectar Satélite";
-                }
-            } catch (e) {
-                console.error("Auth error", e);
-                alert("Error de conexión");
-                btnAuth.innerText = "Conectar Satélite";
-            }
-        });
+        // Check if we have a saved username
+        const savedName = localStorage.getItem('geofinders_username');
+        if(savedName) usernameInput.value = savedName;
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                state.user = user;
-                state.userId = user.uid;
-                document.getElementById('step-auth').classList.add('hidden');
-                document.getElementById('step-game').classList.remove('hidden');
-                document.getElementById('step-game').classList.add('flex');
-                document.getElementById('display-username').innerText = state.username;
-            }
+        btnAuth.addEventListener('click', () => {
+            if(!usernameInput.value) return alert("Introduce un nombre");
+            
+            // Set User State locally
+            state.username = usernameInput.value;
+            state.userId = getOrGenerateUserId();
+            
+            // Save username preference
+            localStorage.setItem('geofinders_username', state.username);
+
+            // Transition UI
+            document.getElementById('step-auth').classList.add('hidden');
+            document.getElementById('step-game').classList.remove('hidden');
+            document.getElementById('step-game').classList.add('flex');
+            document.getElementById('display-username').innerText = state.username;
+            document.getElementById('display-userid').innerText = state.userId.substring(0, 8) + "...";
         });
 
         // --- 3. LOBBY & SETUP ---
@@ -662,7 +662,7 @@
         // --- 6. GAME LOOP & LOGIC ---
 
         function gameLoop() {
-            if(!state.user || state.isDead) return;
+            if(!state.userId || state.isDead) return; // Modified to check state.userId
 
             // 1. Duo Distance Check
             if (state.mode === 'DUO') {
