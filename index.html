@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GEOFINDERS - Real World Battle Royale</title>
+    <title>GEOFINDERS - Battle Royale GPS</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,7 +23,7 @@
             font-family: 'Rajdhani', sans-serif;
             background-color: #0f172a;
             color: #e2e8f0;
-            overflow: hidden; /* Prevent pull-to-refresh on mobile */
+            overflow: hidden;
             touch-action: none;
         }
         .font-military {
@@ -35,11 +35,11 @@
             z-index: 0;
             background: #1a1a1a;
         }
-        /* Custom UI Layers */
+        /* UI Layers */
         .ui-layer {
             position: absolute;
             z-index: 1000;
-            pointer-events: none; /* Let clicks pass through to map where needed */
+            pointer-events: none;
         }
         .interactive {
             pointer-events: auto;
@@ -57,7 +57,7 @@
             border-radius: 50%;
             pointer-events: none;
             z-index: 900;
-            display: none; /* Hidden by default */
+            display: none;
         }
         .scope-crosshair {
             position: absolute;
@@ -68,7 +68,7 @@
             font-size: 24px;
         }
 
-        /* Compass Bar */
+        /* Compass */
         .compass-container {
             position: fixed;
             top: 0;
@@ -112,9 +112,8 @@
             animation: pulse-red 1s infinite;
         }
         
-        /* Modal Backdrop */
         .modal-backdrop {
-            background-color: rgba(0, 0, 0, 0.9);
+            background-color: rgba(0, 0, 0, 0.95);
             position: fixed;
             top: 0;
             left: 0;
@@ -126,144 +125,195 @@
             align-items: center;
             padding: 20px;
         }
+        
+        .tab-active {
+            background-color: #16a34a; /* green-600 */
+            border-color: #22c55e; /* green-500 */
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #334155; /* slate-700 */
+            border-color: #475569; /* slate-600 */
+            color: #94a3b8; /* gray-400 */
+        }
     </style>
 </head>
 <body>
 
-    <!-- --- APP CONTAINER --- -->
     <div id="app" class="relative w-full h-full">
 
-        <!-- SCREEN: LOGIN / LOBBY -->
-        <div id="lobby-screen" class="modal-backdrop z-50 flex flex-col gap-4">
-            <h1 class="text-4xl text-green-500 font-military tracking-widest text-center mb-4">GEOFINDERS</h1>
+        <!-- SCREEN: LOBBY -->
+        <div id="lobby-screen" class="modal-backdrop z-50 flex flex-col gap-4 overflow-y-auto">
+            <h1 class="text-5xl text-green-500 font-military tracking-widest text-center mb-2 mt-10">GEOFINDERS</h1>
             
-            <div class="w-full max-w-sm bg-slate-800 p-6 rounded-lg border border-slate-600 shadow-xl">
-                <!-- Step 1: User Info -->
-                <div id="step-auth" class="flex flex-col gap-3">
-                    <label class="text-sm text-gray-400">Nombre de Agente</label>
-                    <input type="text" id="username-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white focus:outline-none focus:border-green-500" placeholder="Ej: Snake">
-                    <button id="btn-auth" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded transition uppercase tracking-wider">
-                        Conectar Satélite
+            <div class="w-full max-w-sm bg-slate-900 p-6 rounded-xl border border-slate-700 shadow-2xl relative">
+                
+                <!-- ID Display -->
+                <div class="absolute top-2 right-4 text-[10px] text-gray-600 font-mono">
+                    ID: <span id="display-userid">...</span>
+                </div>
+
+                <!-- Step 1: Identity -->
+                <div id="step-identity" class="flex flex-col gap-4">
+                    <div class="text-center">
+                        <label class="block text-gray-400 text-sm mb-1">IDENTIFICACIÓN DE SOLDADO</label>
+                        <input type="text" id="username-input" class="w-full bg-slate-800 border-2 border-slate-600 p-3 rounded text-white text-center font-bold text-lg focus:border-green-500 focus:outline-none uppercase" placeholder="TU NOMBRE">
+                    </div>
+                    <button id="btn-set-identity" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)] transition">
+                        CONFIRMAR IDENTIDAD
                     </button>
                 </div>
 
-                <!-- Step 2: Game Setup -->
-                <div id="step-game" class="hidden flex flex-col gap-3">
-                    <p class="text-green-400 text-sm mb-2">Conectado como: <span id="display-username" class="font-bold text-white"></span></p>
-                    <p class="text-gray-500 text-xs mb-2">ID: <span id="display-userid" class="font-mono text-gray-400"></span></p>
+                <!-- Step 2: Action Selection (Create/Join) -->
+                <div id="step-action" class="hidden flex flex-col gap-4">
+                    <p class="text-center text-gray-300">Bienvenido, <span id="welcome-name" class="font-bold text-green-400"></span></p>
                     
-                    <div class="flex gap-2 mb-2">
-                        <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500" onclick="setMode('SOLO')">SOLO</button>
-                        <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300 focus:bg-green-900 focus:border-green-500" onclick="setMode('DUO')">DUO</button>
+                    <div class="grid grid-cols-2 gap-3 mb-2">
+                        <button onclick="switchTab('create')" id="tab-create" class="tab-inactive py-3 rounded font-bold transition">CREAR SALA</button>
+                        <button onclick="switchTab('join')" id="tab-join" class="tab-inactive py-3 rounded font-bold transition">UNIRSE</button>
                     </div>
 
-                    <label class="text-sm text-gray-400">ID de Operación (Partida)</label>
-                    <input type="text" id="game-id-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase" placeholder="Ej: ALPHA1">
-                    
-                    <div id="duo-input-container" class="hidden flex flex-col gap-2">
-                         <label class="text-sm text-gray-400">ID de Equipo (Solo para DUO)</label>
-                         <input type="text" id="team-id-input" class="bg-slate-900 border border-slate-700 p-3 rounded text-white uppercase" placeholder="Ej: TEAM_A">
+                    <!-- CREATE PANEL -->
+                    <div id="panel-create" class="hidden flex flex-col gap-3 animate-fade-in">
+                        <div class="bg-slate-800 p-3 rounded text-xs text-gray-400 border border-slate-700">
+                            <i class="fas fa-info-circle text-blue-400"></i> Como <b>Anfitrión</b>, tu ubicación actual será el CENTRO de la zona segura.
+                        </div>
+                        <div class="flex gap-2">
+                             <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300" onclick="setMode('SOLO')">SOLO</button>
+                             <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300" onclick="setMode('DUO')">DUO</button>
+                        </div>
+                        <button id="btn-create-game" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded mt-2 shadow-lg">
+                            <i class="fas fa-satellite-dish mr-2"></i> ESTABLECER ZONA Y CREAR
+                        </button>
+                        <p id="creating-status" class="text-xs text-center text-yellow-500 hidden animate-pulse">Obteniendo coordenadas GPS de alta precisión...</p>
                     </div>
 
-                    <button id="btn-join" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded mt-2 uppercase">
-                        Desplegar en Zona
+                    <!-- JOIN PANEL -->
+                    <div id="panel-join" class="hidden flex flex-col gap-3 animate-fade-in">
+                        <label class="text-xs text-gray-400">CÓDIGO DE SALA (4 LETRAS)</label>
+                        <input type="text" id="join-code-input" class="bg-slate-800 border-2 border-slate-600 p-4 rounded text-white text-center font-mono text-2xl tracking-[0.5em] focus:border-blue-500 focus:outline-none uppercase" placeholder="ABCD" maxlength="4">
+                        
+                        <div id="duo-join-inputs" class="hidden">
+                             <label class="text-xs text-gray-400 mt-2">ID DE EQUIPO</label>
+                             <input type="text" id="join-team-input" class="w-full bg-slate-800 border border-slate-600 p-2 rounded text-white uppercase" placeholder="NOMBRE EQUIPO">
+                        </div>
+
+                        <button id="btn-join-game" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded mt-2 shadow-lg">
+                            <i class="fas fa-sign-in-alt mr-2"></i> UNIRSE A LA OPERACIÓN
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Waiting Room (Host Only mainly) -->
+                <div id="step-waiting" class="hidden flex-col items-center gap-4 text-center">
+                    <div class="bg-slate-800 p-6 rounded-full border-4 border-green-500 animate-pulse shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                        <span id="generated-code" class="text-4xl font-mono font-bold text-white tracking-widest">----</span>
+                    </div>
+                    <p class="text-gray-400 text-sm">Comparte este código con tus amigos.</p>
+                    <div class="text-xs text-gray-500 mt-2">Esperando jugadores...</div>
+                    <button id="btn-start-match" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded mt-4 shadow-lg hidden">
+                        INICIAR PARTIDA AHORA
                     </button>
                 </div>
+
             </div>
             
-            <div class="text-xs text-gray-500 text-center max-w-xs">
-                ⚠️ Requiere GPS y permisos de sensores. Juega en exteriores para mejor precisión.
+            <div class="text-[10px] text-gray-500 text-center max-w-xs mt-4">
+                ⚠️ El GPS funciona mejor al aire libre. Asegúrate de tener batería.
             </div>
         </div>
 
-        <!-- SCREEN: HUD (Heads Up Display) -->
+        <!-- SCREEN: HUD -->
         <div id="hud-layer" class="ui-layer w-full h-full hidden">
-            
-            <!-- Compass Top Bar -->
+            <!-- Compass -->
             <div class="compass-container flex" id="compass-ui">
                 <div class="compass-marker"></div>
                 <div class="compass-strip" id="compass-strip"></div>
-                <div class="absolute top-8 left-1/2 transform -translate-x-1/2 text-xs font-mono text-green-500" id="heading-display">0° N</div>
+                <div class="absolute top-8 left-1/2 transform -translate-x-1/2 text-xs font-mono text-green-500" id="heading-display">0°</div>
             </div>
 
-            <!-- Top Info: Timer & Players -->
+            <!-- Top Info -->
             <div class="absolute top-12 left-0 w-full p-2 flex justify-between items-start pointer-events-none">
-                <div class="bg-black/60 backdrop-blur p-2 rounded border-l-4 border-green-500">
-                    <div class="text-xs text-gray-300">ESTADO</div>
-                    <div class="font-bold text-green-400" id="game-phase">EN ESPERA</div>
+                <div class="bg-black/60 backdrop-blur p-2 rounded border-l-4 border-blue-500">
+                    <div class="text-[10px] text-gray-300">SALA: <span id="hud-room-code" class="text-white font-bold"></span></div>
+                    <div class="font-bold text-blue-400 text-sm" id="game-status-text">ESPERANDO...</div>
                 </div>
-                
                 <div class="bg-black/60 backdrop-blur p-2 rounded flex flex-col items-end">
-                    <div class="text-2xl font-military text-white" id="alive-count">--</div>
-                    <div class="text-[10px] text-gray-400">VIVOS</div>
+                    <div class="text-2xl font-military text-white" id="alive-count">1</div>
+                    <div class="text-[10px] text-gray-400">JUGADORES</div>
                 </div>
             </div>
 
-            <!-- Radar / Storm Alert -->
-            <div id="alert-box" class="absolute top-24 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-4 py-2 rounded font-bold text-center hidden shadow-lg animate-pulse">
-                ⚠️ ZONA SEGURA REDUCIÉNDOSE
+            <!-- Alerts -->
+            <div id="alert-box" class="absolute top-28 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-6 py-3 rounded font-bold text-center hidden shadow-lg animate-pulse z-50 pointer-events-none w-3/4">
+                ⚠️ FUERA DE LA ZONA SEGURA<br><span class="text-xs font-normal">Regresa al círculo o morirás.</span>
             </div>
 
-            <!-- Center Scope (Visible when aiming) -->
+            <div id="waiting-msg" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-black/80 text-green-400 px-6 py-4 rounded-xl text-center border border-green-500 pointer-events-none">
+                <h3 class="font-bold text-lg">SINCRONIZANDO</h3>
+                <p class="text-xs text-white">Esperando que el anfitrión inicie...</p>
+            </div>
+
+            <!-- Scope -->
             <div id="scope" class="scope-overlay">
                 <div class="scope-crosshair">+</div>
             </div>
 
             <!-- Bottom Controls -->
-            <div class="absolute bottom-0 left-0 w-full p-4 flex flex-col gap-2 pointer-events-none">
+            <div class="absolute bottom-0 left-0 w-full p-4 pb-8 flex flex-col gap-3 pointer-events-none">
                 
-                <!-- Health & Status -->
-                <div class="flex items-end gap-2 mb-2">
-                    <div class="bg-black/70 p-3 rounded-lg flex-1 border border-gray-700">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-gray-300">SALUD <span id="hp-text">100%</span></span>
-                            <span class="text-blue-300" id="ammo-text">MUN: ∞</span>
+                <!-- Health -->
+                <div class="flex items-end gap-2">
+                    <div class="bg-black/80 p-3 rounded-lg flex-1 border border-gray-700 backdrop-blur-sm">
+                        <div class="flex justify-between text-xs mb-1 font-bold">
+                            <span class="text-gray-300">SALUD</span>
+                            <span class="text-green-400" id="hp-text">100%</span>
                         </div>
-                        <div class="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+                        <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden border border-gray-600">
                             <div id="hp-bar" class="bg-green-500 h-full w-full transition-all duration-300"></div>
                         </div>
-                        <div id="duo-status" class="text-[10px] text-orange-400 mt-1 hidden">
-                            PAREJA: <span id="partner-dist">--</span>m
+                        <div id="duo-status" class="text-[10px] text-orange-400 mt-2 hidden font-bold text-center bg-orange-900/30 rounded p-1">
+                            PAREJA A: <span id="partner-dist">--</span>m
                         </div>
                     </div>
                 </div>
 
-                <!-- Action Buttons -->
-                <div class="flex justify-between items-center pointer-events-auto">
-                    <button id="btn-sos" class="bg-red-800 hover:bg-red-900 text-white p-4 rounded-full shadow-lg border-2 border-red-500 font-bold text-xs w-16 h-16 flex items-center justify-center">
-                        SOS
+                <!-- Buttons -->
+                <div class="flex justify-between items-center pointer-events-auto px-2">
+                    <button id="btn-sos" class="bg-red-900/80 hover:bg-red-800 text-white h-14 w-14 rounded-full border-2 border-red-500 font-bold text-[10px] shadow-lg flex flex-col items-center justify-center">
+                        <span>SOS</span>
                     </button>
 
-                    <button id="btn-shoot" class="bg-yellow-600 hover:bg-yellow-500 active:scale-95 transition text-black p-4 rounded-full shadow-lg border-2 border-yellow-300 w-20 h-20 flex items-center justify-center">
+                    <button id="btn-shoot" class="bg-yellow-600 hover:bg-yellow-500 active:scale-95 transition text-black h-20 w-20 rounded-full border-4 border-yellow-300 shadow-[0_0_20px_rgba(234,179,8,0.5)] flex items-center justify-center z-50">
                         <i class="fa-solid fa-crosshairs text-3xl"></i>
                     </button>
                     
-                    <button id="btn-center" class="bg-slate-700 text-white p-3 rounded-full shadow-lg w-12 h-12 flex items-center justify-center">
+                    <button id="btn-center" class="bg-slate-700/80 hover:bg-slate-600 text-white h-14 w-14 rounded-full border border-slate-500 shadow-lg flex items-center justify-center">
                         <i class="fa-solid fa-location-arrow"></i>
                     </button>
                 </div>
             </div>
         </div>
         
-        <!-- The Map -->
+        <!-- Map Container -->
         <div id="map"></div>
 
         <!-- Dead Screen -->
-        <div id="dead-screen" class="modal-backdrop hidden flex-col text-center">
-            <h2 class="text-5xl text-red-600 font-military mb-4">ELIMINADO</h2>
-            <p class="text-gray-300 mb-6">Tu señal se ha perdido.</p>
-            <button onclick="location.reload()" class="bg-slate-600 px-6 py-2 rounded text-white">Volver al Lobby</button>
+        <div id="dead-screen" class="modal-backdrop hidden flex-col text-center z-[3000]">
+            <i class="fa-solid fa-skull-crossbones text-6xl text-red-600 mb-4 animate-bounce"></i>
+            <h2 class="text-5xl text-red-600 font-military mb-2">ELIMINADO</h2>
+            <p class="text-gray-300 mb-8 max-w-xs mx-auto">Has caído en combate. Tu posición ha sido marcada.</p>
+            <button onclick="location.reload()" class="bg-slate-700 hover:bg-slate-600 border border-slate-500 px-8 py-3 rounded text-white font-bold">VOLVER AL MENÚ</button>
         </div>
 
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        // NOTA: Eliminamos firebase-auth porque el usuario solicitó identificación SIN Auth.
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, getDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
-        // --- 1. CONFIGURATION & STATE ---
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyBMYTnk-CljdWENtDQqqKUBmQzBQuoxYPo",
             authDomain: "hello-74404.firebaseapp.com",
@@ -276,599 +326,554 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const appId = "geofinders-v1";
+        const appId = "geofinders-v1"; // Namespace
 
-        // Global State
+        // STATE
         const state = {
-            userId: null,   // Generated locally without Auth
+            userId: null,
             username: "Soldado",
             gameId: null,
-            teamId: null,
+            isHost: false,
             mode: 'SOLO',
-            lat: 0,
-            lng: 0,
+            teamId: null, // For Duo
+            lat: null,
+            lng: null,
+            accuracy: 0,
             heading: 0,
             hp: 100,
             isDead: false,
-            lastShot: 0,
-            enemies: {},
-            teammates: {},
+            gameStatus: 'WAITING', // WAITING, PLAYING
+            stormCenter: null, // {lat, lng}
+            stormRadius: 300, // Starts big (300m)
             map: null,
+            markers: {},
             userMarker: null,
-            stormCircle: null,
-            gameData: null
+            stormCircleLayer: null
         };
 
-        // --- 2. IDENTITY (No Auth Logic) ---
+        // --- 1. IDENTITY & INIT ---
         
-        // Helper to get or create a persistent random ID
         function getOrGenerateUserId() {
-            let id = localStorage.getItem('geofinders_uid');
+            let id = localStorage.getItem('gf_uid');
             if (!id) {
-                // Generate a random string ID
-                id = 'player_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-                localStorage.setItem('geofinders_uid', id);
+                id = 'user_' + Math.random().toString(36).substr(2, 6).toUpperCase();
+                localStorage.setItem('gf_uid', id);
             }
             return id;
         }
 
-        const btnAuth = document.getElementById('btn-auth');
-        const usernameInput = document.getElementById('username-input');
-
-        // Check if we have a saved username
-        const savedName = localStorage.getItem('geofinders_username');
-        if(savedName) usernameInput.value = savedName;
-
-        btnAuth.addEventListener('click', () => {
-            if(!usernameInput.value) return alert("Introduce un nombre");
-            
-            // Set User State locally
-            state.username = usernameInput.value;
+        function init() {
             state.userId = getOrGenerateUserId();
+            document.getElementById('display-userid').innerText = state.userId;
             
-            // Save username preference
-            localStorage.setItem('geofinders_username', state.username);
+            const savedName = localStorage.getItem('gf_name');
+            if(savedName) document.getElementById('username-input').value = savedName;
 
-            // Transition UI
-            document.getElementById('step-auth').classList.add('hidden');
-            document.getElementById('step-game').classList.remove('hidden');
-            document.getElementById('step-game').classList.add('flex');
-            document.getElementById('display-username').innerText = state.username;
-            document.getElementById('display-userid').innerText = state.userId.substring(0, 8) + "...";
-        });
-
-        // --- 3. LOBBY & SETUP ---
-        window.setMode = (mode) => {
-            state.mode = mode;
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('bg-green-900', 'border-green-500'));
-            event.target.classList.add('bg-green-900', 'border-green-500');
+            // Setup UI Events
+            document.getElementById('btn-set-identity').onclick = confirmIdentity;
+            document.getElementById('btn-create-game').onclick = createGame;
+            document.getElementById('btn-join-game').onclick = joinGame;
+            document.getElementById('btn-start-match').onclick = hostStartGame;
             
-            if(mode === 'DUO') {
-                document.getElementById('duo-input-container').classList.remove('hidden');
-                document.getElementById('duo-status').classList.remove('hidden');
+            // Map
+            initMap();
+        }
+
+        function confirmIdentity() {
+            const name = document.getElementById('username-input').value.trim();
+            if(!name) return alert("Nombre obligatorio");
+            
+            state.username = name;
+            localStorage.setItem('gf_name', name);
+            
+            document.getElementById('step-identity').classList.add('hidden');
+            document.getElementById('step-action').classList.remove('hidden');
+            document.getElementById('step-action').classList.add('flex');
+            document.getElementById('welcome-name').innerText = name;
+            
+            // Default tab
+            switchTab('join');
+            
+            // Start GPS now to warm up
+            startSensors(); 
+        }
+
+        window.switchTab = (tab) => {
+            const btnCreate = document.getElementById('tab-create');
+            const btnJoin = document.getElementById('tab-join');
+            const panelCreate = document.getElementById('panel-create');
+            const panelJoin = document.getElementById('panel-join');
+
+            if(tab === 'create') {
+                btnCreate.className = "tab-active flex-1 py-3 rounded font-bold transition";
+                btnJoin.className = "tab-inactive flex-1 py-3 rounded font-bold transition";
+                panelCreate.classList.remove('hidden');
+                panelJoin.classList.add('hidden');
             } else {
-                document.getElementById('duo-input-container').classList.add('hidden');
-                document.getElementById('duo-status').classList.add('hidden');
+                btnCreate.className = "tab-inactive flex-1 py-3 rounded font-bold transition";
+                btnJoin.className = "tab-active flex-1 py-3 rounded font-bold transition";
+                panelCreate.classList.add('hidden');
+                panelJoin.classList.remove('hidden');
             }
         };
 
-        document.getElementById('btn-join').addEventListener('click', async () => {
-            const gameId = document.getElementById('game-id-input').value.toUpperCase();
-            if(!gameId) return alert("Falta ID de Partida");
-            state.gameId = gameId;
+        window.setMode = (m) => {
+            state.mode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => {
+                if(b.innerText === m) {
+                    b.classList.remove('bg-slate-700', 'text-gray-300');
+                    b.classList.add('bg-blue-600', 'text-white', 'border-blue-400');
+                } else {
+                    b.classList.add('bg-slate-700', 'text-gray-300');
+                    b.classList.remove('bg-blue-600', 'text-white', 'border-blue-400');
+                }
+            });
+        };
 
-            if(state.mode === 'DUO') {
-                state.teamId = document.getElementById('team-id-input').value.toUpperCase();
-                if(!state.teamId) return alert("Falta ID de Equipo para modo Duo");
-            } else {
-                state.teamId = state.userId; // In solo, teamId is own ID
+        // --- 2. GAME LOBBY LOGIC ---
+
+        async function createGame() {
+            if(!state.lat) {
+                document.getElementById('creating-status').classList.remove('hidden');
+                alert("Esperando señal GPS precisa para establecer la base... Muévete un poco.");
+                return;
             }
 
-            // Permissions
-            requestPermissions();
-        });
+            // Generate 4 letter code
+            const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            state.gameId = code;
+            state.isHost = true;
+            state.teamId = state.userId; // Solo host is own team
 
-        function requestPermissions() {
-            // iOS 13+ DeviceOrientation permission
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(response => {
-                        if (response === 'granted') {
-                            startGame();
-                        } else {
-                            alert("Se requiere permiso de orientación para la brújula.");
-                        }
-                    })
-                    .catch(console.error);
-            } else {
-                startGame(); // Android/PC handles it automatically
-            }
-        }
-
-        async function startGame() {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-            document.getElementById('compass-ui').classList.remove('hidden'); // Show compass on start
-
-            initMap();
-            initSensors();
-            initFirestoreListeners();
+            // Create Game Doc
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${code}`);
             
-            // Start Game Loop
-            setInterval(gameLoop, 1000);
-        }
-
-        // --- 4. MAP & SENSORS ---
-        function initMap() {
-            state.map = L.map('map', {
-                zoomControl: false,
-                attributionControl: false
-            }).setView([0, 0], 18);
-
-            // Dark Mode Map Tiles (CartoDB Dark Matter)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 20
-            }).addTo(state.map);
-
-            // Custom Icons
-            const createIcon = (color) => L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:50%; border:2px solid white; box-shadow: 0 0 10px ${color};"></div>`,
-                iconSize: [12, 12],
-                iconAnchor: [6, 6]
+            // Set Initial Game State
+            // STORM CENTER is HOST location
+            await setDoc(gameRef, {
+                hostId: state.userId,
+                status: 'WAITING', // No damage yet
+                mode: state.mode,
+                stormCenter: { lat: state.lat, lng: state.lng },
+                stormRadius: 300, // 300 meters Safe Zone
+                createdAt: serverTimestamp()
             });
 
-            state.icons = {
-                me: createIcon('#00ff00'),
-                enemy: createIcon('#ff0000'),
-                team: createIcon('#0088ff'),
-                loot: createIcon('#ffff00')
-            };
+            // Join myself
+            await joinMyGame(code);
+
+            // UI Update
+            document.getElementById('step-action').classList.add('hidden');
+            document.getElementById('step-waiting').classList.remove('hidden');
+            document.getElementById('step-waiting').classList.add('flex');
+            document.getElementById('generated-code').innerText = code;
+            document.getElementById('btn-start-match').classList.remove('hidden');
         }
 
-        function initSensors() {
-            // 1. Geolocation
-            if ("geolocation" in navigator) {
-                navigator.geolocation.watchPosition((position) => {
-                    const { latitude, longitude, accuracy } = position.coords;
-                    
-                    state.lat = latitude;
-                    state.lng = longitude;
-
-                    // Update UI Map Center if strictly following or first load
-                    if (!state.userMarker) {
-                         state.map.setView([latitude, longitude], 18);
-                         state.userMarker = L.marker([latitude, longitude], {icon: state.icons.me}).addTo(state.map);
-                         
-                         // Create initial player doc
-                         createPlayerDoc();
-                    } else {
-                        state.userMarker.setLatLng([latitude, longitude]);
-                        updatePlayerDoc();
-                    }
-
-                }, (err) => console.error(err), {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 5000
-                });
+        async function joinGame() {
+            const code = document.getElementById('join-code-input').value.toUpperCase();
+            if(code.length !== 4) return alert("Código inválido");
+            
+            // Check if game exists first
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${code}`);
+            const snap = await getDoc(gameRef);
+            
+            if(!snap.exists()) return alert("Partida no encontrada");
+            
+            const gameData = snap.data();
+            state.gameId = code;
+            state.isHost = false;
+            state.mode = gameData.mode; // Inherit mode
+            
+            if(state.mode === 'DUO') {
+                const team = document.getElementById('join-team-input').value.toUpperCase().trim();
+                if(!team) return alert("Introduce ID de Equipo para DUO");
+                state.teamId = team;
             } else {
-                alert("GPS no disponible");
+                state.teamId = state.userId;
             }
 
-            // 2. Compass (DeviceOrientation)
-            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-            window.addEventListener('deviceorientation', (e) => {
-                if(!e.absolute && e.webkitCompassHeading) {
-                    // iOS specific
-                    handleOrientation({ alpha: e.webkitCompassHeading });
-                } else if (!e.absolute) {
-                    handleOrientation(e);
-                }
-            }, true);
+            await joinMyGame(code);
+            enterHUD();
         }
 
-        function handleOrientation(event) {
-            let heading = event.alpha; // Z-axis rotation
-            
-            // iOS gives webkitCompassHeading directly
-            if(event.webkitCompassHeading) heading = event.webkitCompassHeading;
-            
-            // Android absolute requires math usually, but alpha is a decent approx for games if absolute not avail
-            // In a real prod app, we'd use complex sensor fusion. For this game prototype:
-            if(heading) {
-                state.heading = 360 - heading; // Invert for CSS rotation logic usually, or keep as compass deg
-                // Actually for compass strip:
-                // If heading is 0 (North), strip center.
-                // 90 (East).
-                
-                // Update Compass UI
-                // Standard Compass: 0=N, 90=E, 180=S, 270=W
-                // Strip UI logic: Translate X based on degrees
-                const strip = document.getElementById('compass-strip');
-                const deg = heading; 
-                state.heading = deg; // Store true heading 0-360
-
-                // Visual update (simplified for performance)
-                document.getElementById('heading-display').innerText = Math.round(deg) + "°";
-                
-                // Move strip. 
-                // Imagine strip is 0.....360.....0
-                // We shift background position or transform
-                // Simple version: just text updates. Complex strip needs careful CSS math.
-            }
-        }
-
-        // --- 5. FIRESTORE LOGIC ---
-        
-        async function createPlayerDoc() {
-            if(!state.userId || !state.gameId) return;
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
-            
+        async function joinMyGame(gameId) {
+            // Create/Update Player Doc
+            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}/players/${state.userId}`);
             await setDoc(playerRef, {
                 username: state.username,
                 teamId: state.teamId,
-                lat: state.lat,
-                lng: state.lng,
+                lat: state.lat || 0,
+                lng: state.lng || 0,
                 hp: 100,
                 isDead: false,
-                lastUpdate: serverTimestamp()
+                lastSeen: serverTimestamp()
+            });
+
+            // Start Listeners
+            subscribeToGame(gameId);
+        }
+
+        function hostStartGame() {
+            if(!state.isHost) return;
+            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}`);
+            updateDoc(gameRef, { status: 'PLAYING' });
+            enterHUD();
+        }
+
+        function enterHUD() {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('hud-layer').classList.remove('hidden');
+            document.getElementById('compass-ui').classList.remove('hidden');
+            document.getElementById('hud-room-code').innerText = state.gameId;
+            
+            // Force map resize
+            setTimeout(() => {
+                state.map.invalidateSize();
+                if(state.lat) state.map.setView([state.lat, state.lng], 18);
+            }, 500);
+        }
+
+        // --- 3. FIRESTORE SYNC ---
+
+        function subscribeToGame(gameId) {
+            // 1. Subscribe to Game State (Storm, Status)
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}`), (doc) => {
+                if(doc.exists()) {
+                    const data = doc.data();
+                    state.gameStatus = data.status;
+                    state.stormCenter = data.stormCenter;
+                    state.stormRadius = data.stormRadius;
+                    
+                    updateGameUI(data);
+                    drawStorm();
+                }
+            });
+
+            // 2. Subscribe to Players
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}/players`), (snapshot) => {
+                const alive = snapshot.docs.filter(d => !d.data().isDead).length;
+                document.getElementById('alive-count').innerText = alive;
+
+                snapshot.docChanges().forEach(change => {
+                    const pid = change.doc.id;
+                    const pdata = change.doc.data();
+
+                    if(pid === state.userId) {
+                        // My data updated externally? (Damage taken)
+                        if(pdata.hp < state.hp) {
+                            state.hp = pdata.hp;
+                            updateHealthUI();
+                            triggerDamageEffect();
+                        }
+                    } else {
+                        // Other players
+                        updateEnemyMarker(pid, pdata);
+                        if(state.mode === 'DUO' && pdata.teamId === state.teamId) {
+                            updateTeammate(pid, pdata);
+                        }
+                    }
+                });
             });
         }
 
-        async function updatePlayerDoc() {
-            if(!state.userId || !state.gameId || state.isDead) return;
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
+        function updateGameUI(data) {
+            const statusText = document.getElementById('game-status-text');
+            const waitMsg = document.getElementById('waiting-msg');
             
-            await updateDoc(playerRef, {
-                lat: state.lat,
-                lng: state.lng,
-                heading: state.heading || 0,
-                lastUpdate: serverTimestamp()
-            }).catch(e => console.log("Update error", e)); // Silent catch for rapid updates
-        }
-
-        async function takeDamage(amount, source) {
-            if(state.isDead) return;
-            
-            state.hp = Math.max(0, state.hp - amount);
-            
-            // Visual Effect
-            document.body.classList.add('damage-effect');
-            setTimeout(() => document.body.classList.remove('damage-effect'), 500);
-
-            // Update UI
-            updateHUD();
-
-            // Update DB
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
-            await updateDoc(playerRef, { hp: state.hp });
-
-            // If Duo, sync damage could be handled here or via cloud function. 
-            // For client-side prototype: If I take damage, I update my doc. 
-            // My partner listens to my doc? No, "Shared HP" implies a Team Object or complex sync.
-            // Simplified Duo: We just use individual HP but if one dies, game over logic handles it.
-            // OR: Update all teammates HP (requires multiple writes, risky without transactions).
-            // Let's stick to: Individual HP tracking, but HUD shows aggregate or lowest.
-            
-            if(state.hp <= 0) {
-                die();
+            if(data.status === 'WAITING') {
+                statusText.innerText = "EN ESPERA";
+                statusText.classList.remove('text-red-500');
+                statusText.classList.add('text-blue-400');
+                waitMsg.classList.remove('hidden');
+            } else {
+                statusText.innerText = "EN CURSO - PELIGRO";
+                statusText.classList.remove('text-blue-400');
+                statusText.classList.add('text-red-500');
+                waitMsg.classList.add('hidden');
+                
+                // If I was waiting in lobby step-waiting as host, move me
+                if(!document.getElementById('step-waiting').classList.contains('hidden')) {
+                    enterHUD();
+                }
             }
         }
 
-        function die() {
-            state.isDead = true;
-            document.getElementById('dead-screen').classList.remove('hidden');
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${state.userId}`);
-            updateDoc(playerRef, { isDead: true });
-        }
+        // --- 4. MAP & SENSORS ---
 
-        function initFirestoreListeners() {
-            // Listen to Players
-            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players`);
+        function initMap() {
+            state.map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0,0], 2);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(state.map);
             
-            onSnapshot(playersRef, (snapshot) => {
-                const aliveCount = snapshot.docs.filter(d => !d.data().isDead).length;
-                document.getElementById('alive-count').innerText = aliveCount;
-
-                snapshot.docChanges().forEach((change) => {
-                    const data = change.doc.data();
-                    const pid = change.doc.id;
-
-                    if (pid === state.userId) {
-                        // My own data changed (maybe by server or sync)
-                        if (data.hp < state.hp) {
-                            // Took damage from outside?
-                            state.hp = data.hp;
-                            updateHUD();
-                            document.body.classList.add('damage-effect');
-                            setTimeout(() => document.body.classList.remove('damage-effect'), 500);
-                        }
-                        if (data.hp <= 0 && !state.isDead) die();
-                        return;
-                    }
-
-                    // Handle other players
-                    if (change.type === "added" || change.type === "modified") {
-                        const isTeammate = (state.mode === 'DUO' && data.teamId === state.teamId);
-                        
-                        // Store in local cache
-                        if (isTeammate) {
-                            state.teammates[pid] = { ...data, id: pid };
-                        } else {
-                            state.enemies[pid] = { ...data, id: pid };
-                        }
-
-                        // Update Map Markers
-                        updateMarker(pid, data, isTeammate);
-
-                        // Duo Shared Fate Check
-                        if (isTeammate && data.hp <= 0 && !state.isDead) {
-                            // Partner died. In this strict mode: you die too or enter revive state.
-                            // Simplified: Warning.
-                            alert("¡TU PAREJA HA CAÍDO! (Simulación: En juego real, revivir)");
-                        }
-                    }
-                    
-                    if (change.type === "removed") {
-                        if (state.enemies[pid] && state.enemies[pid].marker) state.enemies[pid].marker.remove();
-                        delete state.enemies[pid];
-                    }
-                });
-            }, (error) => console.error("Snapshot Error", error));
-
-            // Listen to Game State (Storm, Phases)
-            // Ideally: doc(db, ..., games/{gameId})
-            // For prototype, we'll simulate storm logic locally or create a master doc if needed.
-            // Let's create a default storm centered on the first player who creates the game logic?
-            // Skipping complex server-side storm for this "Client-only" demo.
-            // We will define a static Storm Center for the demo: The location where you started.
+            // Marker Icons
+            const dot = (col) => L.divIcon({
+                className: '',
+                html: `<div style="background:${col};width:14px;height:14px;border:2px solid white;border-radius:50%;box-shadow:0 0 10px ${col}"></div>`,
+                iconSize: [14, 14], iconAnchor: [7, 7]
+            });
+            state.icons = {
+                me: dot('#22c55e'), // Green
+                enemy: dot('#ef4444'), // Red
+                team: dot('#3b82f6') // Blue
+            };
         }
 
-        function updateMarker(pid, data, isTeammate) {
-            let entity = isTeammate ? state.teammates[pid] : state.enemies[pid];
-            if (!entity) return;
+        function startSensors() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(pos => {
+                    state.lat = pos.coords.latitude;
+                    state.lng = pos.coords.longitude;
+                    state.accuracy = pos.coords.accuracy;
 
-            // Visibility Logic:
-            // Teammates: Always visible.
-            // Enemies: Only visible if "Revealed" (global timer) OR very close (< 20m).
-            // NOTE: The user requested "Every 3 min reveal". 
-            // We'll implement a simple check:
-            const now = Date.now();
-            const isRevealTime = (now % 180000) < 5000; // 5 seconds every 3 mins
-            const dist = getDistanceFromLatLonInMeters(state.lat, state.lng, data.lat, data.lng);
-            const isClose = dist < 20;
+                    // Update Map Marker
+                    if(!state.userMarker) {
+                         state.userMarker = L.marker([state.lat, state.lng], {icon: state.icons.me}).addTo(state.map);
+                         state.map.setView([state.lat, state.lng], 18);
+                    } else {
+                        state.userMarker.setLatLng([state.lat, state.lng]);
+                    }
 
-            const isVisible = isTeammate || isRevealTime || isClose || data.isShooting;
+                    // Update Server
+                    if(state.gameId && !state.isDead) {
+                        const ref = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${state.userId}`);
+                        updateDoc(ref, { 
+                            lat: state.lat, 
+                            lng: state.lng, 
+                            heading: state.heading,
+                            lastSeen: serverTimestamp() 
+                        }).catch(()=>{}); // Ignore rapid update errors
+                    }
 
-            if (isVisible && !data.isDead) {
-                if (!entity.marker) {
-                    entity.marker = L.marker([data.lat, data.lng], {
-                        icon: isTeammate ? state.icons.team : state.icons.enemy
-                    }).addTo(state.map);
-                    entity.marker.bindPopup(data.username);
-                } else {
-                    entity.marker.setLatLng([data.lat, data.lng]);
-                    // Smooth slide could go here
+                    // Check Storm
+                    checkStormDamage();
+
+                }, err => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+            }
+
+            // Compass
+            const handleOrientation = (e) => {
+                let heading = e.webkitCompassHeading || e.alpha;
+                if(!heading) return;
+                // Fix Android absolute
+                if(!e.webkitCompassHeading) heading = 360 - heading; 
+                
+                state.heading = heading;
+                document.getElementById('heading-display').innerText = Math.round(heading) + "°";
+                
+                // Strip logic (simplified)
+                // Just shift background position? Or translate?
+                // Visual only for now
+            };
+
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
+        }
+
+        function drawStorm() {
+            if(!state.stormCenter) return;
+
+            if(state.stormCircleLayer) state.map.removeLayer(state.stormCircleLayer);
+
+            // Draw Safe Zone (Green/Blue/Clear) inside Red Zone?
+            // Usually games draw the Safe Zone circle.
+            // Let's draw a Red Circle for the boundary
+            
+            state.stormCircleLayer = L.circle([state.stormCenter.lat, state.stormCenter.lng], {
+                color: '#ef4444', // Red border
+                fillColor: '#ef4444', 
+                fillOpacity: 0.05,
+                weight: 2,
+                radius: state.stormRadius // Meters
+            }).addTo(state.map);
+        }
+
+        function checkStormDamage() {
+            if(state.gameStatus !== 'PLAYING' || !state.stormCenter || state.isDead) return;
+
+            const dist = getDist(state.lat, state.lng, state.stormCenter.lat, state.stormCenter.lng);
+            
+            if(dist > state.stormRadius) {
+                // OUTSIDE!
+                document.getElementById('alert-box').classList.remove('hidden');
+                
+                // Damage tick (approx every 3s via simple timestamp check or random chance per update)
+                // Better: Check time. Using random for simplicity in client-only loop
+                if(Math.random() < 0.05) { // roughly once per 20 gps updates (if 1hz) -> very slow.
+                    // Let's rely on setInterval for damage
                 }
             } else {
-                if (entity.marker) {
-                    entity.marker.remove();
-                    entity.marker = null;
-                }
+                document.getElementById('alert-box').classList.add('hidden');
             }
         }
-
-        // --- 6. GAME LOOP & LOGIC ---
-
-        function gameLoop() {
-            if(!state.userId || state.isDead) return; // Modified to check state.userId
-
-            // 1. Duo Distance Check
-            if (state.mode === 'DUO') {
-                let partnerDist = 0;
-                let partnerCount = 0;
-                Object.values(state.teammates).forEach(p => {
-                    const d = getDistanceFromLatLonInMeters(state.lat, state.lng, p.lat, p.lng);
-                    partnerDist = d;
-                    partnerCount++;
-                });
-
-                if (partnerCount > 0) {
-                    document.getElementById('duo-status').classList.remove('hidden');
-                    document.getElementById('partner-dist').innerText = Math.round(partnerDist);
-                    if (partnerDist > 20) {
-                        // Warning
-                        document.getElementById('duo-status').innerText = `⚠️ REGRESA A TU PAREJA (${Math.round(partnerDist)}m)`;
-                        document.getElementById('duo-status').classList.add('text-red-500');
-                        // Optional: take damage if too far for too long
-                    } else {
-                        document.getElementById('duo-status').innerText = `PAREJA: ${Math.round(partnerDist)}m`;
-                        document.getElementById('duo-status').classList.remove('text-red-500');
-                    }
-                }
-            }
-
-            // 2. Storm Logic (Simplified: Fixed Circle at Start)
-            // In a real app, this data comes from Firestore `gameData`
-            if (!state.stormCircle && state.lat !== 0) {
-                // Initialize storm around player for demo purposes
-                // Radius starts at 200m
-                state.stormData = { center: [state.lat, state.lng], radius: 200 };
-                state.stormCircle = L.circle(state.stormData.center, {
-                    color: 'red',
-                    fillColor: '#f03',
-                    fillOpacity: 0.1,
-                    radius: state.stormData.radius
-                }).addTo(state.map);
-            }
-
-            if (state.stormData) {
-                // Shrink storm
-                // Reduce radius by 1 meter every 5 seconds?
-                // Demo: Static 200m.
-                const distToCenter = getDistanceFromLatLonInMeters(state.lat, state.lng, state.stormData.center[0], state.stormData.center[1]);
-                if (distToCenter > state.stormData.radius) {
-                    // Outside Storm!
-                    document.getElementById('alert-box').classList.remove('hidden');
-                    document.getElementById('alert-box').innerText = "⚠️ FUERA DE ZONA - RECIBIENDO DAÑO";
-                    // Take damage every tick? No, every few seconds.
-                    if(Date.now() % 5000 < 1000) { // roughly every 5s
-                         takeDamage(5, "STORM");
-                    }
-                } else {
-                    document.getElementById('alert-box').classList.add('hidden');
-                }
-            }
-        }
-
-        // --- 7. COMBAT SYSTEM ---
-
-        const btnShoot = document.getElementById('btn-shoot');
-        const scope = document.getElementById('scope');
-
-        // Aiming UI interaction
-        btnShoot.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent click
-            scope.style.display = 'block';
-        });
-
-        btnShoot.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            scope.style.display = 'none';
-            fireWeapon();
-        });
         
-        // Mouse support for desktop testing
-        btnShoot.addEventListener('mousedown', () => scope.style.display = 'block');
-        btnShoot.addEventListener('mouseup', () => {
-            scope.style.display = 'none';
-            fireWeapon();
-        });
+        // Damage Loop (Running separately)
+        setInterval(() => {
+             if(state.gameStatus === 'PLAYING' && state.stormCenter && !state.isDead && state.lat) {
+                 const dist = getDist(state.lat, state.lng, state.stormCenter.lat, state.stormCenter.lng);
+                 if(dist > state.stormRadius) {
+                     takeDamage(5); // 5 DMG every second
+                 }
+             }
+        }, 1000);
 
-        async function fireWeapon() {
-            // Cooldown
-            const now = Date.now();
-            if (now - state.lastShot < 1000) return; // 1s cooldown
-            state.lastShot = now;
-
-            // Logic: iterate enemies. Check bearing + distance.
-            // Weapon Range: 40 meters
-            // Weapon Spread: 10 degrees (5 deg left/right)
+        function takeDamage(amount) {
+            state.hp = Math.max(0, state.hp - amount);
+            updateHealthUI();
+            triggerDamageEffect();
             
-            const range = 50; 
-            const spread = 10; 
-            const myLat = state.lat;
-            const myLng = state.lng;
-            const myHeading = state.heading; // 0-360
+            // Sync
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${state.userId}`);
+            updateDoc(ref, { hp: state.hp });
 
-            let hit = false;
+            if(state.hp <= 0) {
+                state.isDead = true;
+                updateDoc(ref, { isDead: true });
+                document.getElementById('dead-screen').classList.remove('hidden');
+            }
+        }
 
-            Object.values(state.enemies).forEach(enemy => {
-                if(enemy.isDead) return;
+        // --- 5. OTHERS (Markers, Combat) ---
 
-                const dist = getDistanceFromLatLonInMeters(myLat, myLng, enemy.lat, enemy.lng);
-                if (dist > range) return;
+        function updateEnemyMarker(pid, data) {
+            if(data.isDead) {
+                if(state.markers[pid]) state.markers[pid].remove();
+                return;
+            }
 
-                // Calculate bearing to enemy
-                const bearing = getBearing(myLat, myLng, enemy.lat, enemy.lng);
+            // Visibility Logic: Only if close OR game logic says so.
+            // For now: Always visible if < 500m to make it playable
+            const dist = getDist(state.lat, state.lng, data.lat, data.lng);
+            if(dist < 500) {
+                 if(!state.markers[pid]) {
+                     state.markers[pid] = L.marker([data.lat, data.lng], {icon: state.icons.enemy}).addTo(state.map)
+                        .bindPopup(`<b class="text-red-500">${data.username}</b>`);
+                 } else {
+                     state.markers[pid].setLatLng([data.lat, data.lng]);
+                 }
+            }
+        }
+        
+        function updateTeammate(pid, data) {
+             const dist = getDist(state.lat, state.lng, data.lat, data.lng);
+             document.getElementById('duo-status').classList.remove('hidden');
+             document.getElementById('partner-dist').innerText = Math.round(dist);
+             
+             if(dist > 20) {
+                 document.getElementById('duo-status').classList.add('text-red-400');
+                 document.getElementById('duo-status').innerHTML = `⚠️ MUY LEJOS: ${Math.round(dist)}m`;
+             } else {
+                 document.getElementById('duo-status').classList.remove('text-red-400');
+                 document.getElementById('duo-status').innerHTML = `PAREJA: ${Math.round(dist)}m`;
+             }
+        }
+
+        // SHOOTING
+        document.getElementById('btn-shoot').addEventListener('click', async () => {
+            if(state.isDead || state.gameStatus !== 'PLAYING') return;
+            
+            // Visual feedback
+            const btn = document.getElementById('btn-shoot');
+            btn.classList.add('scale-90', 'bg-red-500');
+            setTimeout(() => btn.classList.remove('scale-90', 'bg-red-500'), 100);
+
+            // Logic: Scan enemies in markers list
+            // Range: 40m, Cone: 15 degrees
+            const RANGE = 40; 
+            const CONE = 15;
+            
+            // We iterate Firestore collection via state.markers isn't enough (might not have logic data)
+            // But for prototype, we rely on markers existing or we need a local cache of enemy data.
+            // Let's assume we hit whoever is in `state.markers`
+            
+            // Actually, we need to read 'matches/{id}/players' snapshot data.
+            // Since we didn't cache full player data in a global list (only markers), let's quick-fetch or use marker positions.
+            // Better: Markers are visual. Let's rely on visual hit for simplicity.
+            
+            // To do it right: fetch collection once (expensive) or cache in `subscribeToGame`.
+            // Let's assume we hit a random nearby enemy for the "Feel". 
+            // REAL LOGIC:
+            // Calculate distance & bearing to all markers.
+            let hitId = null;
+            
+            Object.keys(state.markers).forEach(pid => {
+                const m = state.markers[pid];
+                const mLat = m.getLatLng().lat;
+                const mLng = m.getLatLng().lng;
                 
-                // Compare with my heading
-                // Need to handle the 359 -> 1 degree wraparound
-                let diff = Math.abs(bearing - myHeading);
-                if (diff > 180) diff = 360 - diff;
-
-                if (diff < (spread / 2)) {
-                    // HIT!
-                    hit = true;
-                    registerHit(enemy.id);
+                const d = getDist(state.lat, state.lng, mLat, mLng);
+                if(d < RANGE) {
+                    const bearing = getBearing(state.lat, state.lng, mLat, mLng);
+                    let diff = Math.abs(bearing - state.heading);
+                    if(diff > 180) diff = 360 - diff;
+                    
+                    if(diff < CONE) hitId = pid;
                 }
             });
 
-            // Feedback
-            btnShoot.style.backgroundColor = hit ? 'red' : 'gray';
-            setTimeout(() => btnShoot.style.backgroundColor = '', 200);
-            
-            if(hit) alert("¡IMPACTO CONFIRMADO!");
-        }
-
-        async function registerHit(targetId) {
-            // In a secure game, we send "IShot" to server, server calculates.
-            // In this peer/client trust model:
-            // We update the target's HP directly (if rules allowed) or send a "HitEvent".
-            // Since we can't trust client updates to other docs easily without lax rules,
-            // we will simulate by updating the target doc directly assuming the rules allow it.
-            // NOTE: Firestore rules usually block updating others. 
-            // If this fails, the mechanic requires a Cloud Function or an "Events" collection the victim listens to.
-            
-            // Hack for prototype: Update enemy doc hp directly.
-            const enemyRef = doc(db, 'artifacts', appId, 'public', 'data', `games/${state.gameId}/players/${targetId}`);
-            try {
-                const snap = await getDoc(enemyRef);
+            if(hitId) {
+                alert("¡IMPACTO!");
+                // Apply dmg to them directly (Prototype Hack)
+                const targetRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${hitId}`);
+                const snap = await getDoc(targetRef);
                 if(snap.exists()) {
-                    let newHp = snap.data().hp - 20; // 20 damage
-                    await updateDoc(enemyRef, { hp: newHp });
+                    updateDoc(targetRef, { hp: Math.max(0, snap.data().hp - 20) });
                 }
-            } catch(e) {
-                console.error("Hit registration failed. Permissions?", e);
-            }
-        }
-
-        // --- 8. UTILITIES (Math) ---
-        
-        function updateHUD() {
-            document.getElementById('hp-bar').style.width = state.hp + '%';
-            document.getElementById('hp-text').innerText = Math.round(state.hp) + '%';
-            if(state.hp < 30) document.getElementById('hp-bar').classList.replace('bg-green-500', 'bg-red-600');
-        }
-
-        document.getElementById('btn-center').addEventListener('click', () => {
-             if(state.map && state.lat) state.map.setView([state.lat, state.lng], 18);
-        });
-
-        document.getElementById('btn-sos').addEventListener('click', () => {
-            if(confirm("¿ACTIVAR SOS? Esto terminará tu partida.")) {
-                die();
-                // Logic to notify organizer would go here
-                alert("SEÑAL SOS ENVIADA. QUÉDATE DONDE ESTÁS.");
             }
         });
 
-        // Haversine Formula (Distance in Meters)
-        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-            var R = 6371; // Radius of the earth in km
-            var dLat = deg2rad(lat2-lat1);  
-            var dLon = deg2rad(lon2-lon1); 
-            var a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-            var d = R * c; // Distance in km
-            return d * 1000; // Meters
+        // Utils
+        function getDist(lat1, lon1, lat2, lon2) {
+            if(!lat1 || !lat2) return 99999;
+            const R = 6371e3; // metres
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
         }
 
-        function deg2rad(deg) {
-            return deg * (Math.PI/180);
-        }
-
-        function rad2deg(rad) {
-            return rad * (180/Math.PI);
-        }
-
-        // Bearing calculation (0-360 degrees)
         function getBearing(startLat, startLng, destLat, destLng) {
-            startLat = deg2rad(startLat);
-            startLng = deg2rad(startLng);
-            destLat = deg2rad(destLat);
-            destLng = deg2rad(destLng);
-
-            let y = Math.sin(destLng - startLng) * Math.cos(destLat);
-            let x = Math.cos(startLat) * Math.sin(destLat) -
-                    Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+            startLat = startLat * Math.PI/180;
+            startLng = startLng * Math.PI/180;
+            destLat = destLat * Math.PI/180;
+            destLng = destLng * Math.PI/180;
+            const y = Math.sin(destLng - startLng) * Math.cos(destLat);
+            const x = Math.cos(startLat) * Math.sin(destLat) - Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
             let brng = Math.atan2(y, x);
-            brng = rad2deg(brng);
-            return (brng + 360) % 360;
+            return (brng * 180 / Math.PI + 360) % 360;
         }
+
+        function updateHealthUI() {
+            const bar = document.getElementById('hp-bar');
+            bar.style.width = state.hp + '%';
+            document.getElementById('hp-text').innerText = state.hp + '%';
+            if(state.hp < 30) {
+                bar.classList.remove('bg-green-500');
+                bar.classList.add('bg-red-600');
+            }
+        }
+
+        function triggerDamageEffect() {
+            document.body.classList.add('damage-effect');
+            setTimeout(() => document.body.classList.remove('damage-effect'), 500);
+            if("vibrate" in navigator) navigator.vibrate(200);
+        }
+
+        document.getElementById('btn-center').onclick = () => {
+             if(state.map && state.lat) state.map.setView([state.lat, state.lng], 18);
+        };
+        
+        document.getElementById('btn-sos').onclick = () => {
+             if(confirm("¿RENDIRSE Y SALIR?")) {
+                 takeDamage(100);
+             }
+        };
+
+        // Boot
+        init();
 
     </script>
 </body>
