@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEOFINDERS - ADMIN</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .admin-panel {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            border: 1px solid var(--glass-border);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        button {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="glass-panel admin-panel">
+        <h1>PANEL DE CONTROL</h1>
+
+        <div class="control-group">
+            <h2>GESTIÓN DE PARTIDA</h2>
+            <button class="btn-primary" onclick="resetGame()">REINICIAR PARTIDA</button>
+            <button class="btn-primary" onclick="revealLocations()">REVELAR UBICACIONES (5s)</button>
+        </div>
+
+        <div class="control-group">
+            <h2>TORMENTA</h2>
+            <input type="number" id="storm-lat" placeholder="Latitud Centro">
+            <input type="number" id="storm-lng" placeholder="Longitud Centro">
+            <input type="number" id="storm-radius" placeholder="Radio Inicial (m)" value="500">
+            <button class="btn-primary" onclick="setStorm()">INICIAR TORMENTA</button>
+            <button class="btn-primary" onclick="shrinkStorm()">REDUCIR ZONA (0.8x)</button>
+        </div>
+
+        <div class="control-group">
+            <h2>JUGADORES</h2>
+            <div id="player-list">Cargando...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getDatabase, ref, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { firebaseConfig } from "./js/config.js";
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.resetGame = () => {
+            if (confirm("¿Seguro? Esto borrará a todos los jugadores.")) {
+                remove(ref(db, 'games/main_game'));
+            }
+        };
+
+        window.revealLocations = () => {
+            update(ref(db, 'games/main_game/state'), {
+                revealAll: true,
+                revealEndTime: Date.now() + 5000
+            });
+
+            setTimeout(() => {
+                update(ref(db, 'games/main_game/state'), {
+                    revealAll: false
+                });
+            }, 5000);
+        };
+
+        window.setStorm = () => {
+            const lat = parseFloat(document.getElementById('storm-lat').value);
+            const lng = parseFloat(document.getElementById('storm-lng').value);
+            const radius = parseFloat(document.getElementById('storm-radius').value);
+
+            if (!lat || !lng) { alert("Necesitas coordenadas"); return; }
+
+            set(ref(db, 'games/main_game/storm'), {
+                lat: lat,
+                lng: lng,
+                radius: radius, // Current danger zone
+                safeLat: lat,
+                safeLng: lng,
+                safeRadius: radius // Safe zone (starts same as radius)
+            });
+        };
+
+        window.shrinkStorm = () => {
+            // Read current storm, reduce safe radius
+            // For simplicity, just updating safeRadius in DB
+            // In a real game, you'd animate 'radius' shrinking to 'safeRadius' over time.
+            alert("Función de reducción simplificada: Ajusta el radio manualmente por ahora.");
+        };
+
+        // Monitor Players
+        onValue(ref(db, 'games/main_game/players'), (snap) => {
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            snap.forEach(child => {
+                const p = child.val();
+                const div = document.createElement('div');
+                div.innerText = `${p.name} [${p.mode}] - HP: ${p.hp}`;
+                list.appendChild(div);
+            });
+        });
+    </script>
+</body>
+
+</html>
