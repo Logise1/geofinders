@@ -1,24 +1,29 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GEOFINDERS - Tactical GPS Survival</title>
-    
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-    
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap"
+        rel="stylesheet">
+
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Leaflet Map -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
 
     <!-- Background / Map Container -->
@@ -26,17 +31,35 @@
 
     <!-- Overlay UI -->
     <div id="ui-layer">
-        
+
         <!-- LOGIN / LOBBY SCREEN -->
         <section id="lobby-screen" class="screen active">
             <div class="glass-panel lobby-panel">
                 <h1 class="glitch-text" data-text="GEOFINDERS">GEOFINDERS</h1>
                 <p class="subtitle">TACTICAL GPS SURVIVAL</p>
-                
+
                 <div class="input-group">
                     <input type="text" id="player-name" placeholder="NOMBRE DE AGENTE" autocomplete="off">
                 </div>
 
+                <!-- Game Room Selection -->
+                <div class="room-controls">
+                    <div class="tabs">
+                        <button class="tab-btn active" onclick="switchTab('create')">CREAR PARTIDA</button>
+                        <button class="tab-btn" onclick="switchTab('join')">UNIRSE</button>
+                    </div>
+
+                    <div id="tab-create" class="tab-content active">
+                        <p class="info-text">Crear una nueva zona de operaciones</p>
+                    </div>
+
+                    <div id="tab-join" class="tab-content">
+                        <input type="text" id="game-code-input" placeholder="CÓDIGO DE PARTIDA"
+                            style="text-transform:uppercase">
+                    </div>
+                </div>
+
+                <!-- Game Mode Selection -->
                 <div class="mode-select">
                     <button class="mode-btn selected" data-mode="solo" onclick="selectMode('solo')">
                         <i class="fa-solid fa-user"></i>
@@ -49,20 +72,29 @@
                 </div>
 
                 <div id="duo-code-section" class="hidden">
-                    <input type="text" id="duo-code" placeholder="CÓDIGO DE PAREJA (Opcional)">
-                    <p class="hint">Deja vacío para crear nueva pareja</p>
+                    <input type="text" id="duo-code" placeholder="CÓDIGO DE PAREJA">
                 </div>
 
-                <button class="btn-primary" onclick="startGame()">
-                    <span class="btn-content">INICIAR MISIÓN</span>
+                <button class="btn-primary" onclick="handleGameStart()">
+                    <span class="btn-content" id="start-btn-text">INICIAR OPERACIÓN</span>
                     <div class="btn-glitch"></div>
                 </button>
             </div>
         </section>
 
+        <!-- SCATTER PHASE OVERLAY -->
+        <div id="scatter-overlay" class="hidden">
+            <div class="scatter-content">
+                <h1 class="warning-text">¡DISPERSIÓN!</h1>
+                <p>CORRE A UNA POSICIÓN SEGURA</p>
+                <div class="huge-timer" id="scatter-timer">02:00</div>
+                <p class="sub-info">EL RASTREO COMENZARÁ PRONTO</p>
+            </div>
+        </div>
+
         <!-- GAME HUD (Hidden by default) -->
         <section id="game-hud" class="screen hidden">
-            
+
             <!-- Top Bar: Storm Timer & Compass -->
             <div class="top-hud">
                 <div class="storm-timer glass-panel-sm">
@@ -91,7 +123,7 @@
 
             <!-- Bottom Bar: Stats & Actions -->
             <div class="bottom-hud">
-                
+
                 <div class="stats-container glass-panel">
                     <div class="stat-row">
                         <i class="fa-solid fa-heart pulse-red"></i>
@@ -112,7 +144,7 @@
                         <i class="fa-solid fa-tower-broadcast"></i>
                         <span>SOS</span>
                     </button>
-                    
+
                     <button id="btn-shoot" class="btn-round combat" onclick="toggleCombatMode()">
                         <i class="fa-solid fa-crosshairs"></i>
                         <span>AIM</span>
@@ -141,19 +173,200 @@
 
     <!-- Scripts -->
     <!-- Leaflet -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <!-- Firebase (Modular SDKs via CDN) -->
-    <script type="module" src="js/app.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <!-- Global Functions (Non-module for HTML onclicks) -->
-    <script>
-        // Bridge for HTML onclick events to Module functions
-        window.selectMode = (mode) => window.dispatchEvent(new CustomEvent('selectMode', {detail: mode}));
-        window.startGame = () => window.dispatchEvent(new Event('startGame'));
-        window.toggleCombatMode = () => window.dispatchEvent(new Event('toggleCombatMode'));
-        window.fireWeapon = () => window.dispatchEvent(new Event('fireWeapon'));
-        window.triggerSOS = () => window.dispatchEvent(new Event('triggerSOS'));
-    </script>
-</body>
-</html>
+    <!DOCTYPE html>
+    <html lang="es">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>GEOFINDERS - Tactical GPS Survival</title>
+
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap"
+            rel="stylesheet">
+
+        <!-- Icons -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+        <!-- Leaflet Map -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="css/style.css">
+    </head>
+
+    <body>
+
+        <!-- Background / Map Container -->
+        <div id="map"></div>
+
+        <!-- Overlay UI -->
+        <div id="ui-layer">
+
+            <!-- LOGIN / LOBBY SCREEN -->
+            <section id="lobby-screen" class="screen active">
+                <div class="glass-panel lobby-panel">
+                    <h1 class="glitch-text" data-text="GEOFINDERS">GEOFINDERS</h1>
+                    <p class="subtitle">TACTICAL GPS SURVIVAL</p>
+
+                    <div class="input-group">
+                        <input type="text" id="player-name" placeholder="NOMBRE DE AGENTE" autocomplete="off">
+                    </div>
+
+                    <!-- Game Room Selection -->
+                    <div class="room-controls">
+                        <div class="tabs">
+                            <button class="tab-btn active" onclick="switchTab('create')">CREAR PARTIDA</button>
+                            <button class="tab-btn" onclick="switchTab('join')">UNIRSE</button>
+                        </div>
+
+                        <div id="tab-create" class="tab-content active">
+                            <p class="info-text">Crear una nueva zona de operaciones</p>
+                        </div>
+
+                        <div id="tab-join" class="tab-content">
+                            <input type="text" id="game-code-input" placeholder="CÓDIGO DE PARTIDA"
+                                style="text-transform:uppercase">
+                        </div>
+                    </div>
+
+                    <!-- Game Mode Selection -->
+                    <div class="mode-select">
+                        <button class="mode-btn selected" data-mode="solo" onclick="selectMode('solo')">
+                            <i class="fa-solid fa-user"></i>
+                            <span>SOLO</span>
+                        </button>
+                        <button class="mode-btn" data-mode="duo" onclick="selectMode('duo')">
+                            <i class="fa-solid fa-user-group"></i>
+                            <span>DUO</span>
+                        </button>
+                    </div>
+
+                    <div id="duo-code-section" class="hidden">
+                        <input type="text" id="duo-code" placeholder="CÓDIGO DE PAREJA">
+                    </div>
+
+                    <button class="btn-primary" onclick="handleGameStart()">
+                        <span class="btn-content" id="start-btn-text">INICIAR OPERACIÓN</span>
+                        <div class="btn-glitch"></div>
+                    </button>
+                </div>
+            </section>
+
+            <!-- SCATTER PHASE OVERLAY -->
+            <div id="scatter-overlay" class="hidden">
+                <div class="scatter-content">
+                    <h1 class="warning-text">¡DISPERSIÓN!</h1>
+                    <p>CORRE A UNA POSICIÓN SEGURA</p>
+                    <div class="huge-timer" id="scatter-timer">02:00</div>
+                    <p class="sub-info">EL RASTREO COMENZARÁ PRONTO</p>
+                </div>
+            </div>
+
+            <!-- GAME HUD (Hidden by default) -->
+            <section id="game-hud" class="screen hidden">
+
+                <!-- Top Bar: Storm Timer & Compass -->
+                <div class="top-hud">
+                    <div class="storm-timer glass-panel-sm">
+                        <i class="fa-solid fa-cloud-bolt"></i>
+                        <span id="storm-countdown">03:00</span>
+                    </div>
+                    <div class="compass-strip">
+                        <div id="compass-arrow"><i class="fa-solid fa-caret-up"></i></div>
+                        <div class="compass-ticks">
+                            <span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span>
+                        </div>
+                    </div>
+                    <div class="players-alive glass-panel-sm">
+                        <i class="fa-solid fa-skull"></i>
+                        <span id="alive-count">--</span>
+                    </div>
+                </div>
+
+                <!-- Notifications Area -->
+                <div id="notification-area"></div>
+
+                <!-- Center: Crosshair (Only visible when aiming mode?) -->
+                <div id="crosshair" class="hidden">
+                    <div class="reticle"></div>
+                </div>
+
+                <!-- Bottom Bar: Stats & Actions -->
+                <div class="bottom-hud">
+
+                    <div class="stats-container glass-panel">
+                        <div class="stat-row">
+                            <i class="fa-solid fa-heart pulse-red"></i>
+                            <div class="bar-container">
+                                <div id="health-bar" class="bar-fill" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                        <div class="stat-row" id="shield-row">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            <div class="bar-container">
+                                <div id="shield-bar" class="bar-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button id="btn-sos" class="btn-round danger" onlongpress="triggerSOS()">
+                            <i class="fa-solid fa-tower-broadcast"></i>
+                            <span>SOS</span>
+                        </button>
+
+                        <button id="btn-shoot" class="btn-round combat" onclick="toggleCombatMode()">
+                            <i class="fa-solid fa-crosshairs"></i>
+                            <span>AIM</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Combat Overlay -->
+                <div id="combat-overlay" class="hidden">
+                    <button class="fire-btn" onclick="fireWeapon()">FIRE</button>
+                    <button class="cancel-btn" onclick="toggleCombatMode()">CANCEL</button>
+                </div>
+
+            </section>
+
+            <!-- DEATH SCREEN -->
+            <section id="death-screen" class="screen hidden">
+                <div class="glass-panel death-panel">
+                    <h1 class="danger-text">ELIMINADO</h1>
+                    <p id="death-reason">Has caído en combate</p>
+                    <button class="btn-secondary" onclick="location.reload()">VOLVER AL LOBBY</button>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Scripts -->
+        <!-- Leaflet -->
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+        <!-- Firebase (Modular SDKs via CDN) -->
+        <script type="module" src="js/app.js"></script>
+
+        <!-- Global Functions (Non-module for HTML onclicks) -->
+        <script>
+            // Bridge for HTML onclick events to Module functions
+            window.switchTab = (tab) => window.dispatchEvent(new CustomEvent('switchTab', { detail: tab }));
+            window.handleGameStart = () => window.dispatchEvent(new Event('handleGameStart'));
+            window.selectMode = (mode) => window.dispatchEvent(new CustomEvent('selectMode', { detail: mode }));
+            window.toggleCombatMode = () => window.dispatchEvent(new Event('toggleCombatMode'));
+            window.fireWeapon = () => window.dispatchEvent(new Event('fireWeapon'));
+            window.triggerSOS = () => window.dispatchEvent(new Event('triggerSOS'));
+        </script>
+    </body>
+
+    </html>
