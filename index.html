@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GEOFINDERS - Battle Royale GPS</title>
+    <title>GEOFINDERS - Battle Royale GPS (RTDB)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -136,6 +136,10 @@
             border-color: #475569; /* slate-600 */
             color: #94a3b8; /* gray-400 */
         }
+        
+        .gps-status-bad { color: #ef4444; }
+        .gps-status-ok { color: #22c55e; }
+        .gps-status-warn { color: #eab308; }
     </style>
 </head>
 <body>
@@ -162,12 +166,19 @@
                     <button id="btn-set-identity" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded shadow-[0_0_15px_rgba(34,197,94,0.4)] transition">
                         CONFIRMAR IDENTIDAD
                     </button>
+                    <p class="text-xs text-gray-500 text-center mt-2">Al confirmar, se solicitará acceso GPS.</p>
                 </div>
 
                 <!-- Step 2: Action Selection (Create/Join) -->
                 <div id="step-action" class="hidden flex flex-col gap-4">
                     <p class="text-center text-gray-300">Bienvenido, <span id="welcome-name" class="font-bold text-green-400"></span></p>
                     
+                    <!-- GPS Status Indicator -->
+                    <div class="bg-black/40 p-2 rounded flex justify-between items-center text-xs border border-slate-700">
+                        <span>SEÑAL GPS:</span>
+                        <span id="gps-status-text" class="font-bold gps-status-warn">BUSCANDO...</span>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-3 mb-2">
                         <button onclick="switchTab('create')" id="tab-create" class="tab-inactive py-3 rounded font-bold transition">CREAR SALA</button>
                         <button onclick="switchTab('join')" id="tab-join" class="tab-inactive py-3 rounded font-bold transition">UNIRSE</button>
@@ -182,10 +193,10 @@
                              <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300" onclick="setMode('SOLO')">SOLO</button>
                              <button class="mode-btn flex-1 py-2 bg-slate-700 rounded border border-slate-600 text-gray-300" onclick="setMode('DUO')">DUO</button>
                         </div>
-                        <button id="btn-create-game" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded mt-2 shadow-lg">
+                        <button id="btn-create-game" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded mt-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-satellite-dish mr-2"></i> ESTABLECER ZONA Y CREAR
                         </button>
-                        <p id="creating-status" class="text-xs text-center text-yellow-500 hidden animate-pulse">Obteniendo coordenadas GPS de alta precisión...</p>
+                        <p id="creating-error" class="text-xs text-center text-red-500 hidden font-bold"></p>
                     </div>
 
                     <!-- JOIN PANEL -->
@@ -198,7 +209,7 @@
                              <input type="text" id="join-team-input" class="w-full bg-slate-800 border border-slate-600 p-2 rounded text-white uppercase" placeholder="NOMBRE EQUIPO">
                         </div>
 
-                        <button id="btn-join-game" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded mt-2 shadow-lg">
+                        <button id="btn-join-game" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded mt-2 shadow-lg disabled:opacity-50">
                             <i class="fas fa-sign-in-alt mr-2"></i> UNIRSE A LA OPERACIÓN
                         </button>
                     </div>
@@ -219,7 +230,7 @@
             </div>
             
             <div class="text-[10px] text-gray-500 text-center max-w-xs mt-4">
-                ⚠️ El GPS funciona mejor al aire libre. Asegúrate de tener batería.
+                ⚠️ Si el GPS falla: Asegúrate de dar permisos, activa la ubicación en el móvil y prueba en exteriores.
             </div>
         </div>
 
@@ -308,10 +319,10 @@
 
     </div>
 
-    <!-- Firebase Logic -->
+    <!-- Firebase Logic (RTDB) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, updateDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getDatabase, ref, set, update, onValue, get, child, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
 
         // CONFIG
         const firebaseConfig = {
@@ -325,8 +336,7 @@
         };
 
         const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const appId = "geofinders-v1"; // Namespace
+        const db = getDatabase(app);
 
         // STATE
         const state = {
@@ -395,7 +405,7 @@
             switchTab('join');
             
             // Start GPS now to warm up
-            startSensors(); 
+            tryStartGPS(); 
         }
 
         window.switchTab = (tab) => {
@@ -434,8 +444,12 @@
 
         async function createGame() {
             if(!state.lat) {
-                document.getElementById('creating-status').classList.remove('hidden');
-                alert("Esperando señal GPS precisa para establecer la base... Muévete un poco.");
+                // Try to force one last time or just show error
+                document.getElementById('creating-error').classList.remove('hidden');
+                document.getElementById('creating-error').innerText = "ERROR: No hay señal GPS. Revisa permisos.";
+                
+                // Retry GPS in background
+                tryStartGPS();
                 return;
             }
 
@@ -445,17 +459,15 @@
             state.isHost = true;
             state.teamId = state.userId; // Solo host is own team
 
-            // Create Game Doc
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${code}`);
+            // Create Game Data in RTDB
+            const gameRef = ref(db, 'matches/' + code);
             
-            // Set Initial Game State
-            // STORM CENTER is HOST location
-            await setDoc(gameRef, {
+            await set(gameRef, {
                 hostId: state.userId,
-                status: 'WAITING', // No damage yet
+                status: 'WAITING',
                 mode: state.mode,
                 stormCenter: { lat: state.lat, lng: state.lng },
-                stormRadius: 300, // 300 meters Safe Zone
+                stormRadius: 300,
                 createdAt: serverTimestamp()
             });
 
@@ -475,15 +487,15 @@
             if(code.length !== 4) return alert("Código inválido");
             
             // Check if game exists first
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${code}`);
-            const snap = await getDoc(gameRef);
+            const gameRef = ref(db, 'matches/' + code);
+            const snapshot = await get(gameRef);
             
-            if(!snap.exists()) return alert("Partida no encontrada");
+            if(!snapshot.exists()) return alert("Partida no encontrada");
             
-            const gameData = snap.data();
+            const gameData = snapshot.val();
             state.gameId = code;
             state.isHost = false;
-            state.mode = gameData.mode; // Inherit mode
+            state.mode = gameData.mode; 
             
             if(state.mode === 'DUO') {
                 const team = document.getElementById('join-team-input').value.toUpperCase().trim();
@@ -498,9 +510,9 @@
         }
 
         async function joinMyGame(gameId) {
-            // Create/Update Player Doc
-            const playerRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}/players/${state.userId}`);
-            await setDoc(playerRef, {
+            // Create/Update Player Data
+            const playerRef = ref(db, 'matches/' + gameId + '/players/' + state.userId);
+            await set(playerRef, {
                 username: state.username,
                 teamId: state.teamId,
                 lat: state.lat || 0,
@@ -516,8 +528,8 @@
 
         function hostStartGame() {
             if(!state.isHost) return;
-            const gameRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}`);
-            updateDoc(gameRef, { status: 'PLAYING' });
+            const gameRef = ref(db, 'matches/' + state.gameId);
+            update(gameRef, { status: 'PLAYING' });
             enterHUD();
         }
 
@@ -534,13 +546,18 @@
             }, 500);
         }
 
-        // --- 3. FIRESTORE SYNC ---
+        // --- 3. RTDB SYNC ---
 
         function subscribeToGame(gameId) {
-            // 1. Subscribe to Game State (Storm, Status)
-            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}`), (doc) => {
-                if(doc.exists()) {
-                    const data = doc.data();
+            // Subscribe to Everything in the Match
+            const matchRef = ref(db, 'matches/' + gameId);
+            
+            onValue(matchRef, (snapshot) => {
+                const data = snapshot.val();
+                if(!data) return;
+
+                // Game State
+                if(data.status) {
                     state.gameStatus = data.status;
                     state.stormCenter = data.stormCenter;
                     state.stormRadius = data.stormRadius;
@@ -548,32 +565,38 @@
                     updateGameUI(data);
                     drawStorm();
                 }
-            });
 
-            // 2. Subscribe to Players
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', `matches/${gameId}/players`), (snapshot) => {
-                const alive = snapshot.docs.filter(d => !d.data().isDead).length;
-                document.getElementById('alive-count').innerText = alive;
+                // Players
+                if(data.players) {
+                    const players = data.players;
+                    
+                    // Alive Counter
+                    let aliveCount = 0;
+                    Object.values(players).forEach(p => {
+                        if(!p.isDead) aliveCount++;
+                    });
+                    document.getElementById('alive-count').innerText = aliveCount;
 
-                snapshot.docChanges().forEach(change => {
-                    const pid = change.doc.id;
-                    const pdata = change.doc.data();
-
-                    if(pid === state.userId) {
-                        // My data updated externally? (Damage taken)
-                        if(pdata.hp < state.hp) {
-                            state.hp = pdata.hp;
-                            updateHealthUI();
-                            triggerDamageEffect();
+                    // Iterate players
+                    Object.keys(players).forEach(pid => {
+                        const pdata = players[pid];
+                        
+                        if(pid === state.userId) {
+                            // Sync My Data (Damage taken externally)
+                            if(pdata.hp < state.hp) {
+                                state.hp = pdata.hp;
+                                updateHealthUI();
+                                triggerDamageEffect();
+                            }
+                        } else {
+                            // Other Players
+                            updateEnemyMarker(pid, pdata);
+                            if(state.mode === 'DUO' && pdata.teamId === state.teamId) {
+                                updateTeammate(pid, pdata);
+                            }
                         }
-                    } else {
-                        // Other players
-                        updateEnemyMarker(pid, pdata);
-                        if(state.mode === 'DUO' && pdata.teamId === state.teamId) {
-                            updateTeammate(pid, pdata);
-                        }
-                    }
-                });
+                    });
+                }
             });
         }
 
@@ -592,7 +615,6 @@
                 statusText.classList.add('text-red-500');
                 waitMsg.classList.add('hidden');
                 
-                // If I was waiting in lobby step-waiting as host, move me
                 if(!document.getElementById('step-waiting').classList.contains('hidden')) {
                     enterHUD();
                 }
@@ -618,56 +640,114 @@
             };
         }
 
-        function startSensors() {
-            if ("geolocation" in navigator) {
-                navigator.geolocation.watchPosition(pos => {
-                    state.lat = pos.coords.latitude;
-                    state.lng = pos.coords.longitude;
-                    state.accuracy = pos.coords.accuracy;
-
-                    // Update Map Marker
-                    if(!state.userMarker) {
-                         state.userMarker = L.marker([state.lat, state.lng], {icon: state.icons.me}).addTo(state.map);
-                         state.map.setView([state.lat, state.lng], 18);
-                    } else {
-                        state.userMarker.setLatLng([state.lat, state.lng]);
-                    }
-
-                    // Update Server
-                    if(state.gameId && !state.isDead) {
-                        const ref = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${state.userId}`);
-                        updateDoc(ref, { 
-                            lat: state.lat, 
-                            lng: state.lng, 
-                            heading: state.heading,
-                            lastSeen: serverTimestamp() 
-                        }).catch(()=>{}); // Ignore rapid update errors
-                    }
-
-                    // Check Storm
-                    checkStormDamage();
-
-                }, err => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+        function tryStartGPS() {
+            if (!("geolocation" in navigator)) {
+                updateGPSStatus("NO SOPORTADO", "bad");
+                return;
             }
 
-            // Compass
-            const handleOrientation = (e) => {
+            updateGPSStatus("BUSCANDO...", "warn");
+
+            // 1. Try to get a single fix quickly (High Accuracy)
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    handleGPSUpdate(pos);
+                    // 2. Start watching
+                    startWatchingGPS(true);
+                },
+                (err) => {
+                    console.warn("High Accuracy Failed, trying Low...", err);
+                    // 3. Fallback to Low Accuracy
+                    startWatchingGPS(false);
+                },
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+        }
+
+        function startWatchingGPS(highAccuracy) {
+             const options = {
+                 enableHighAccuracy: highAccuracy,
+                 maximumAge: 0,
+                 timeout: 10000
+             };
+
+             navigator.geolocation.watchPosition(
+                 handleGPSUpdate,
+                 handleGPSError,
+                 options
+             );
+        }
+
+        function handleGPSUpdate(pos) {
+             state.lat = pos.coords.latitude;
+             state.lng = pos.coords.longitude;
+             state.accuracy = pos.coords.accuracy;
+             
+             updateGPSStatus("OK (" + Math.round(state.accuracy) + "m)", "ok");
+             
+             // Update Map
+             if(!state.userMarker) {
+                 state.userMarker = L.marker([state.lat, state.lng], {icon: state.icons.me}).addTo(state.map);
+                 state.map.setView([state.lat, state.lng], 18);
+             } else {
+                 state.userMarker.setLatLng([state.lat, state.lng]);
+             }
+
+             // Update Server
+             if(state.gameId && !state.isDead) {
+                 const playerRef = ref(db, 'matches/' + state.gameId + '/players/' + state.userId);
+                 update(playerRef, { 
+                     lat: state.lat, 
+                     lng: state.lng, 
+                     heading: state.heading,
+                     lastSeen: serverTimestamp() 
+                 }).catch(()=>{}); 
+             }
+
+             checkStormDamage();
+        }
+
+        function handleGPSError(err) {
+            console.error("GPS Watch Error", err);
+            let msg = "ERROR GPS";
+            if(err.code === 1) msg = "PERMISO DENEGADO";
+            if(err.code === 2) msg = "SIN SEÑAL";
+            if(err.code === 3) msg = "TIEMPO AGOTADO";
+            
+            updateGPSStatus(msg, "bad");
+            
+            // Show creating error if stuck there
+            if(!document.getElementById('panel-create').classList.contains('hidden')) {
+                 document.getElementById('creating-error').classList.remove('hidden');
+                 document.getElementById('creating-error').innerText = "⚠️ " + msg;
+            }
+        }
+
+        function updateGPSStatus(text, type) {
+            const el = document.getElementById('gps-status-text');
+            el.innerText = text;
+            el.className = "font-bold"; // reset
+            if(type === 'ok') el.classList.add('gps-status-ok');
+            if(type === 'warn') el.classList.add('gps-status-warn');
+            if(type === 'bad') el.classList.add('gps-status-bad');
+            
+            // Enable create button if OK
+            if(type === 'ok') {
+                document.getElementById('btn-create-game').disabled = false;
+                document.getElementById('btn-join-game').disabled = false;
+                document.getElementById('creating-error').classList.add('hidden');
+            }
+        }
+
+        // Compass
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', (e) => {
                 let heading = e.webkitCompassHeading || e.alpha;
                 if(!heading) return;
-                // Fix Android absolute
                 if(!e.webkitCompassHeading) heading = 360 - heading; 
-                
                 state.heading = heading;
                 document.getElementById('heading-display').innerText = Math.round(heading) + "°";
-                
-                // Strip logic (simplified)
-                // Just shift background position? Or translate?
-                // Visual only for now
-            };
-
-            if (window.DeviceOrientationEvent) {
-                window.addEventListener('deviceorientation', handleOrientation);
-            }
+            });
         }
 
         function drawStorm() {
@@ -675,16 +755,12 @@
 
             if(state.stormCircleLayer) state.map.removeLayer(state.stormCircleLayer);
 
-            // Draw Safe Zone (Green/Blue/Clear) inside Red Zone?
-            // Usually games draw the Safe Zone circle.
-            // Let's draw a Red Circle for the boundary
-            
             state.stormCircleLayer = L.circle([state.stormCenter.lat, state.stormCenter.lng], {
-                color: '#ef4444', // Red border
+                color: '#ef4444', 
                 fillColor: '#ef4444', 
                 fillOpacity: 0.05,
                 weight: 2,
-                radius: state.stormRadius // Meters
+                radius: state.stormRadius 
             }).addTo(state.map);
         }
 
@@ -694,25 +770,18 @@
             const dist = getDist(state.lat, state.lng, state.stormCenter.lat, state.stormCenter.lng);
             
             if(dist > state.stormRadius) {
-                // OUTSIDE!
                 document.getElementById('alert-box').classList.remove('hidden');
-                
-                // Damage tick (approx every 3s via simple timestamp check or random chance per update)
-                // Better: Check time. Using random for simplicity in client-only loop
-                if(Math.random() < 0.05) { // roughly once per 20 gps updates (if 1hz) -> very slow.
-                    // Let's rely on setInterval for damage
-                }
             } else {
                 document.getElementById('alert-box').classList.add('hidden');
             }
         }
         
-        // Damage Loop (Running separately)
+        // Damage Loop
         setInterval(() => {
              if(state.gameStatus === 'PLAYING' && state.stormCenter && !state.isDead && state.lat) {
                  const dist = getDist(state.lat, state.lng, state.stormCenter.lat, state.stormCenter.lng);
                  if(dist > state.stormRadius) {
-                     takeDamage(5); // 5 DMG every second
+                     takeDamage(5); 
                  }
              }
         }, 1000);
@@ -723,12 +792,12 @@
             triggerDamageEffect();
             
             // Sync
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${state.userId}`);
-            updateDoc(ref, { hp: state.hp });
+            const playerRef = ref(db, 'matches/' + state.gameId + '/players/' + state.userId);
+            update(playerRef, { hp: state.hp });
 
             if(state.hp <= 0) {
                 state.isDead = true;
-                updateDoc(ref, { isDead: true });
+                update(playerRef, { isDead: true });
                 document.getElementById('dead-screen').classList.remove('hidden');
             }
         }
@@ -741,8 +810,6 @@
                 return;
             }
 
-            // Visibility Logic: Only if close OR game logic says so.
-            // For now: Always visible if < 500m to make it playable
             const dist = getDist(state.lat, state.lng, data.lat, data.lng);
             if(dist < 500) {
                  if(!state.markers[pid]) {
@@ -772,28 +839,13 @@
         document.getElementById('btn-shoot').addEventListener('click', async () => {
             if(state.isDead || state.gameStatus !== 'PLAYING') return;
             
-            // Visual feedback
             const btn = document.getElementById('btn-shoot');
             btn.classList.add('scale-90', 'bg-red-500');
             setTimeout(() => btn.classList.remove('scale-90', 'bg-red-500'), 100);
 
-            // Logic: Scan enemies in markers list
-            // Range: 40m, Cone: 15 degrees
             const RANGE = 40; 
             const CONE = 15;
             
-            // We iterate Firestore collection via state.markers isn't enough (might not have logic data)
-            // But for prototype, we rely on markers existing or we need a local cache of enemy data.
-            // Let's assume we hit whoever is in `state.markers`
-            
-            // Actually, we need to read 'matches/{id}/players' snapshot data.
-            // Since we didn't cache full player data in a global list (only markers), let's quick-fetch or use marker positions.
-            // Better: Markers are visual. Let's rely on visual hit for simplicity.
-            
-            // To do it right: fetch collection once (expensive) or cache in `subscribeToGame`.
-            // Let's assume we hit a random nearby enemy for the "Feel". 
-            // REAL LOGIC:
-            // Calculate distance & bearing to all markers.
             let hitId = null;
             
             Object.keys(state.markers).forEach(pid => {
@@ -813,11 +865,14 @@
 
             if(hitId) {
                 alert("¡IMPACTO!");
-                // Apply dmg to them directly (Prototype Hack)
-                const targetRef = doc(db, 'artifacts', appId, 'public', 'data', `matches/${state.gameId}/players/${hitId}`);
-                const snap = await getDoc(targetRef);
-                if(snap.exists()) {
-                    updateDoc(targetRef, { hp: Math.max(0, snap.data().hp - 20) });
+                // Apply dmg logic: Fetch user HP, subtract, update.
+                const targetRef = ref(db, 'matches/' + state.gameId + '/players/' + hitId);
+                const snapshot = await get(targetRef);
+                
+                if(snapshot.exists()) {
+                    const targetData = snapshot.val();
+                    const newHp = Math.max(0, targetData.hp - 20);
+                    update(targetRef, { hp: newHp });
                 }
             }
         });
@@ -825,7 +880,7 @@
         // Utils
         function getDist(lat1, lon1, lat2, lon2) {
             if(!lat1 || !lat2) return 99999;
-            const R = 6371e3; // metres
+            const R = 6371e3; 
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
